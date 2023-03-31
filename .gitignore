@@ -1,0 +1,8 @@
+*.md
+.docker
+!README*.md
+/.vscode
+**/*.env
+commands*
+
+**/*/.DS_Store

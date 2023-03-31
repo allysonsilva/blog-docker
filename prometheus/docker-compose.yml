@@ -1,0 +1,56 @@
+version: '3.9'
+
+networks:
+    traefik_network:
+        external: true
+        name: ${TRAEFIK_DOCKER_NETWORK}
+
+volumes:
+    prometheus:
+
+services:
+
+    # docker compose \
+    # --verbose --compatibility \
+    # --env-file .env \
+    # -f prometheus/docker-compose.yml \
+    #  up \
+    # --force-recreate --no-build --no-deps
+    prometheus:
+        image: prom/prometheus:v2.37.6
+        hostname: prometheus
+        container_name: ${COMPOSE_PROJECT_NAME}_prometheus
+        command:
+            - --config.file=/etc/prometheus/prometheus.yaml
+            - --storage.tsdb.path=/prometheus
+            - --storage.tsdb.retention.size=256MB
+            - --storage.tsdb.retention.time=360h
+            - --web.console.libraries=/etc/prometheus/console_libraries
+            - --web.console.templates=/etc/prometheus/consoles
+            - --web.enable-lifecycle
+        # labels:
+        #     - "traefik.enable=true"
+        #     - "traefik.tags=public"
+        #     - "traefik.http.routers.prometheus-rtr.rule=Host(`prometheus.localhost`)"
+        #     - "traefik.http.routers.prometheus-rtr.entrypoints=metrics"
+        #     - "traefik.http.routers.prometheus-rtr.service=prometheus-svc"
+        #     - "traefik.http.services.prometheus-svc.loadbalancer.server.port=9090"
+        #     - "traefik.http.services.prometheus-svc.loadbalancer.server.scheme=http"
+        #     - "traefik.http.services.prometheus-svc.loadbalancer.passhostheader=true"
+        expose:
+            - 9090
+        volumes:
+            - type: bind
+              source: ./configs/
+              target: /etc/prometheus/
+              read_only: true
+            - type: volume
+              source: prometheus
+              target: /prometheus
+        networks:
+            traefik_network:
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"

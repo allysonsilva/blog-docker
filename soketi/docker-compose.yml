@@ -1,0 +1,50 @@
+version: '3.9'
+
+networks:
+    app_network:
+        external: true
+        name: ${APP_DOCKER_NETWORK}
+    traefik_network:
+        external: true
+        name: ${TRAEFIK_DOCKER_NETWORK}
+
+services:
+
+    soketi:
+        image: 'quay.io/soketi/soketi:1.4-16-debian'
+        hostname: soketi
+        container_name: ${COMPOSE_PROJECT_NAME}_soketi
+        labels:
+            traefik.enable: true
+            traefik.tags: public
+            traefik.http.routers.soketi-rtr.rule: "Host(`ws.${APP_DOMAIN}`)"
+            traefik.http.routers.soketi-rtr.priority: 20
+            traefik.http.routers.soketi-rtr.entrypoints: websecure
+            traefik.http.routers.soketi-rtr.middlewares: security@file
+            traefik.http.routers.soketi-rtr.service: soketi-svc
+            traefik.http.services.soketi-svc.loadbalancer.server.port: 6001
+            traefik.http.services.soketi-svc.loadbalancer.server.scheme: http
+            traefik.http.services.soketi-svc.loadbalancer.passhostheader: true
+        environment:
+            SOKETI_METRICS_ENABLED: 'true'
+            SOKETI_METRICS_SERVER_PORT: 9601
+            SOKETI_METRICS_DRIVER: prometheus
+            SOKETI_APP_MANAGER_DRIVER: array
+        env_file:
+            - .env
+        networks:
+            app_network:
+            traefik_network:
+        restart: unless-stopped
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "5"
+                mode: "non-blocking"
+                tag: "logging-soketi"
+        deploy:
+            resources:
+                limits:
+                    cpus: '2'
+                    memory: 1024M

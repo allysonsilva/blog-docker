@@ -1,0 +1,89 @@
+---
+## DYNAMIC CONFIGURATION
+
+http:
+
+    middlewares:
+
+        security:
+            chain:
+                middlewares:
+                    - HSTS-headers
+                    - secure-headers
+                    - real-ip@docker
+
+        management:
+            chain:
+                middlewares:
+                    - security
+                    - low-rateLimit
+                    - noindex-page-headers
+
+        # http(s)://(www.) to https://
+        redirect-to-https:
+            # redirectScheme:
+            #     scheme: https
+            #     permanent: true
+            #     port: '{{ env "HTTPS_PORT" }}'
+            redirectRegex:
+                regex: "^https?://(?:www\\.)?(.+)"
+                replacement: "https://${1}"
+                permanent: true
+
+        low-rateLimit:
+            rateLimit:
+                average: 100
+                period: 10s
+                burst: 50
+                sourceCriterion:
+                    ipStrategy:
+                        excludedIPs:
+                            - 127.0.0.1/32
+                    # requestHeaderName: X-Real-Ip
+                    # requestHost: true
+
+        with-compress:
+            compress:
+                excludedContentTypes:
+                    - text/event-stream
+
+        autodetect-contentType:
+            contentType:
+                autoDetect: false
+
+        # Available Header Options: https://github.com/unrolled/secure#available-options
+        # A great resource for these headers is your preferred browser's docs. Firefox: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers
+        # https://github.com/OWASP/CheatSheetSeries/blob/master/cheatsheets/Clickjacking_Defense_Cheat_Sheet.md
+        # Check headers here, don't include OAuth when checking headers, otherwise you are checking google's headers: https://securityheaders.com
+        # or check them here: https://observatory.mozilla.org/
+
+        secure-headers:
+            headers:
+                sslProxyHeaders:
+                    X-Forwarded-Proto: https
+                hostsProxyHeaders:
+                    - X-Forwarded-Host
+                browserXssFilter: true
+                contentTypeNosniff: true
+                referrerPolicy: same-origin
+                customFrameOptionsValue: SAMEORIGIN
+                # ContentSecurityPolicy: "default-src * 'self' https: data: blob: 'unsafe-inline' 'unsafe-hashes' 'unsafe-eval'; upgrade-insecure-requests;"
+                # PermissionsPolicy: >-
+                #     camera 'none'; geolocation 'none'; microphone 'none'; payment 'none';
+                #     usb 'none'; midi 'none'; interest-cohort 'none'; fullscreen 'self';
+                customResponseHeaders:
+                    # X-Robots-Tag: "none,noarchive,nosnippet,notranslate,noimageindex,"
+                    server: ""
+
+        HSTS-headers:
+            headers:
+                # HSTS
+                stsPreload: true
+                forceSTSHeader: true
+                stsSeconds: 31536000
+                stsIncludeSubdomains: true
+
+        noindex-page-headers:
+            headers:
+                customResponseHeaders:
+                    X-Robots-Tag: "none,noarchive,nosnippet,notranslate,noimageindex,"

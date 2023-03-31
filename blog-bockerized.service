@@ -1,0 +1,32 @@
+[Unit]
+Description=Blog Dockerized Service
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=alyson
+RestartSec=120
+Restart=on-failure
+TimeoutStopSec=60
+TimeoutStartSec=300
+RemainAfterExit=true
+StandardOutput=journal+console
+WorkingDirectory=/home/alyson/projects/alysonsilva.dev/docker
+ExecStartPre=-/usr/bin/docker compose up
+ExecStart=/usr/bin/make docker/database/up
+ExecStart=/usr/bin/make docker/redis/up
+ExecStart=/usr/bin/make docker/service/up context=traefik services="traefik-whoami"
+ExecStart=/usr/bin/make docker/traefik/up
+ExecStart=-/usr/bin/make docker/service/up context=soketi
+ExecStart=-/usr/bin/make docker/service/up context=portainer
+ExecStart=-/usr/bin/make docker/service/up context=prometheus
+ExecStart=-/usr/bin/make docker/service/up context=grafana
+ExecStart=-VIRTUALIZATION=$(systemd-detect-virt -v) /usr/bin/make docker/service/up context=netdata
+# ExecStartPost=/home/alyson/projects/alysonsilva.dev/docker/scripts/deploy-new-version.sh
+ExecStartPost=/usr/bin/make docker/service/up context=uptime
+# ExecStop=/usr/bin/make docker-rmf
+# ExecStop=/usr/bin/make docker-prune
+
+[Install]
+WantedBy=multi-user.target

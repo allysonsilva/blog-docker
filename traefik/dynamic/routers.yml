@@ -1,0 +1,41 @@
+---
+## DYNAMIC CONFIGURATION
+
+http:
+
+    routers:
+
+        app-rtr:
+            # # (Host(`www.yourdomain.tld`) || Host(`yourdomain.tld`)) && PathPrefix(`/`)
+            # # Host(`blog.yourdomain.tld`) || Host(`yourdomain.tld`) || Host(`www.yourdomain.tld`)
+            # # HostRegexp(`${DOMAIN}`, `{subdomain:[a-z0-9]+}.${DOMAIN}`)
+            # # Catch all domains (Regex matches all strings)
+            rule: 'HostRegexp(`{{ env "APP_DOMAIN" }}`, `{subdomain:[a-z0-9]+}.{{ env "APP_DOMAIN" }}`)'
+            service: app-svc@file
+            priority: 10
+            entryPoints:
+                - websecure
+            middlewares:
+                - security@file
+                - with-compress@file
+
+        # xpto-rtr:
+        #     rule: 'Host(`xpto.{{ env "APP_DOMAIN" }}`)'
+        #     service: xpto-svc
+        #     priority: 20
+        #     entrypoints:
+        #         - websecure
+        #     middlewares:
+        #         - security
+
+        # Global redirect to https
+        # > http-catchall
+        redirect-http-to-https:
+            rule: "HostRegexp(`{host:.+}`)"
+            service: noop@internal
+            priority: 1000
+            entryPoints:
+                - web
+                # - management
+            middlewares:
+                - redirect-to-https

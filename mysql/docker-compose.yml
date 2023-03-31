@@ -1,0 +1,68 @@
+---
+version: '3.9'
+
+networks:
+    app_network:
+        external: true
+        name: ${APP_DOCKER_NETWORK}
+
+volumes:
+    mysql_data:
+
+secrets:
+    mysql_ca:
+        file: ./ssl/ca.pem
+    mysql_server_key:
+        file: ./ssl/server-key.pem
+    mysql_server_cert:
+        file: ./ssl/server-cert.pem
+
+services:
+
+    # mysql \
+    #   -h 127.0.0.1 \
+    #   -P {PORT TCP/3306} -uadmin -pPa55w0rd \
+    #   --ssl-ca=mysql/ssl/ca.pem \
+    #   --ssl-key=mysql/ssl/client-key.pem \
+    #   --ssl-cert=mysql/ssl/client-cert.pem
+    mysql:
+        image: mysql:8.0
+        hostname: mysql
+        container_name: ${COMPOSE_PROJECT_NAME}_mysql
+        secrets:
+            - source: mysql_ca
+              target: /etc/mysql-ssl/ca.pem
+            - source: mysql_server_key
+              target: /etc/mysql-ssl/server-key.pem
+            - source: mysql_server_cert
+              target: /etc/mysql-ssl/server-cert.pem
+        ports:
+            - 3306
+        volumes:
+            - ./scripts:/docker-entrypoint-initdb.d
+            - ./my.cnf:/etc/mysql/conf.d/my.cnf:ro
+            - mysql_data:/var/lib/mysql
+        env_file:
+            - .env
+        networks:
+            app_network:
+        # Graceful shutdown
+        stop_grace_period: 30s
+        restart: on-failure
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "5"
+                mode: "non-blocking"
+                tag: "logging-mysql"
+        # deploy:
+        #     resources:
+        #         limits:
+        #             memory: 2048M
+        healthcheck:
+            test: export MYSQL_PWD="Pa55w0rd"; output=$$(mysqladmin ping --port=3306 --user=$$MYSQL_USER 2>&1); echo $$output | grep 'mysqld is alive' || { echo $$output; exit 1; }
+            start_period: 10s
+            interval: 30s
+            timeout: 5s
+            retries: 3

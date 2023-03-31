@@ -1,0 +1,58 @@
+version: '3.9'
+
+networks:
+    app_network:
+        external: true
+        name: ${APP_DOCKER_NETWORK}
+
+volumes:
+    scheduler_logs:
+
+secrets:
+    mysql_ca:
+        file: ${DOCKER_MYSQL_SSL_PATH}/ca.pem
+    mysql_client_key:
+        file: ${DOCKER_MYSQL_SSL_PATH}/client-key.pem
+    mysql_client_cert:
+        file: ${DOCKER_MYSQL_SSL_PATH}/client-cert.pem
+
+services:
+
+    scheduler:
+        user: root
+        image: ${SCHEDULER_DOCKER_IMAGE}
+        hostname: ${COMPOSE_PROJECT_NAME}_scheduler
+        container_name: ${COMPOSE_PROJECT_NAME}-${CONTAINER_VERSION_SHELL:-${CONTAINER_VERSION}}_scheduler
+        secrets:
+            - source: mysql_ca
+              target: ${REMOTE_SRC}/database/certs/mysql/ca.pem
+            - source: mysql_client_key
+              target: ${REMOTE_SRC}/database/certs/mysql/client-key.pem
+            - source: mysql_client_cert
+              target: ${REMOTE_SRC}/database/certs/mysql/client-cert.pem
+        env_file:
+            - ${DOCKER_PHP_APP_PATH}/.env
+            - ${DOCKER_PHP_SCHEDULER_PATH}/.env
+        volumes:
+            - ${DOCKER_PHP_PATH}/docker-entrypoint.sh:/entrypoint.sh:ro
+            # - ${APP_PATH}:/var/www/app:delegated
+            - type: volume
+              source: scheduler_logs
+              target: /usr/local/var/log
+        # Graceful shutdown
+        stop_signal: SIGQUIT
+        stop_grace_period: 120s
+        networks:
+            app_network:
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "1m"
+                max-file: "5"
+                mode: "non-blocking"
+                tag: "logging-scheduler"
+        deploy:
+            resources:
+                limits:
+                    cpus: '1'
+                    memory: 1024M

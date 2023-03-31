@@ -1,0 +1,53 @@
+version: '3.9'
+
+networks:
+    app_network:
+        external: true
+        name: ${APP_DOCKER_NETWORK}
+    traefik_network:
+        external: true
+        name: ${TRAEFIK_DOCKER_NETWORK}
+
+volumes:
+    uptime_kuma:
+
+services:
+
+    uptime-kuma:
+        image: louislam/uptime-kuma:1
+        hostname: uptime-kuma
+        container_name: ${COMPOSE_PROJECT_NAME}_uptime-kuma
+        labels:
+            traefik.enable: true
+            traefik.tags: public
+            traefik.http.routers.uptime-kuma-rtr.rule: "Host(`uptime.${APP_DOMAIN}`)"
+            traefik.http.routers.uptime-kuma-rtr.priority: 20
+            traefik.http.routers.uptime-kuma-rtr.entrypoints: websecure
+            traefik.http.routers.uptime-kuma-rtr.middlewares: management@file
+            traefik.http.routers.uptime-kuma-rtr.service: uptime-kuma-svc
+            traefik.http.services.uptime-kuma-svc.loadbalancer.server.port: 3001
+            traefik.http.services.uptime-kuma-svc.loadbalancer.server.scheme: http
+            traefik.http.services.uptime-kuma-svc.loadbalancer.passhostheader: true
+        networks:
+            app_network:
+            traefik_network:
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+            - /etc/localtime:/etc/localtime:ro
+            - /etc/timezone:/etc/timezone:ro
+            - type: volume
+              source: uptime_kuma
+              target: /app/data
+        restart: always
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "5"
+                mode: "non-blocking"
+                tag: "logging-uptime-kuma"
+        deploy:
+            resources:
+                limits:
+                    cpus: '2'
+                    memory: 2048M

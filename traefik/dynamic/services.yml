@@ -1,0 +1,12 @@
+---
+## DYNAMIC CONFIGURATION
+
+http:
+
+    # services:
+
+    #     xpto-svc:
+    #         loadBalancer:
+    #             passHostHeader: true
+    #             servers:
+    #                 - url: "http://host.docker.internal:9988"

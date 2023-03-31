@@ -1,0 +1,100 @@
+---
+version: '3.9'
+
+# volumes:
+#     app_logs:
+
+networks:
+    app_network:
+        external: true
+        name: ${APP_DOCKER_NETWORK}
+    traefik_network:
+        external: true
+        name: ${TRAEFIK_DOCKER_NETWORK}
+
+secrets:
+    mysql_ca:
+        file: ${DOCKER_MYSQL_SSL_PATH}/ca.pem
+    mysql_client_key:
+        file: ${DOCKER_MYSQL_SSL_PATH}/client-key.pem
+    mysql_client_cert:
+        file: ${DOCKER_MYSQL_SSL_PATH}/client-cert.pem
+
+services:
+
+    app:
+        image: ${APP_DOCKER_IMAGE:-app/app:1.0}
+        # hostname: ${COMPOSE_PROJECT_NAME}-${CONTAINER_VERSION}_app
+        # container_name: ${COMPOSE_PROJECT_NAME}-${CONTAINER_VERSION}_app
+        # # docker compose -f docker/php/services/app/docker-compose.yml --ansi=auto --env-file docker/.env build --progress=plain app
+        build:
+            context: ${APP_PATH}
+            dockerfile: ${DOCKER_PHP_PATH}/Dockerfile
+            args:
+                APP_ENV: production
+                USER_UID: ${USER_UID}
+                USER_GID: ${USER_GID}
+                DOCKER_FOLDER: ${DOCKER_FOLDER}
+                APP_DOCKER_REPO: ${APP_DOCKER_REPO}
+        secrets:
+            - source: mysql_ca
+              target: ${REMOTE_SRC}/database/certs/mysql/ca.pem
+            - source: mysql_client_key
+              target: ${REMOTE_SRC}/database/certs/mysql/client-key.pem
+            - source: mysql_client_cert
+              target: ${REMOTE_SRC}/database/certs/mysql/client-cert.pem
+        # labels:
+        #     traefik.enable: true
+        #     traefik.tags: public
+        #     traefik.http.routers.app-rtr.priority: 100
+        #     traefik.http.routers.app-rtr.entrypoints: websecure
+        #     traefik.http.routers.app-rtr.rule: Host(`${APP_DOMAIN}`)
+        #     traefik.http.routers.app-rtr.middlewares: security@file
+        #     traefik.http.routers.app-rtr.service: app-svc
+        #     traefik.http.services.app-svc.loadbalancer.server.port: 8000
+        #     traefik.http.services.app-svc.loadbalancer.healthcheck.path: /health
+        #     traefik.http.services.app-svc.loadbalancer.healthcheck.interval: 30s
+        #     traefik.http.services.app-svc.loadbalancer.healthcheck.timeout: 2s
+        volumes:
+            # - ${DOCKER_PHP_PATH}/configs/conf.d/opcache.ini:/usr/local/etc/php/conf.d/docker-php-ext-opcache.ini
+            # - ${DOCKER_PHP_PATH}/configs/php-local.ini:/usr/local/etc/php/php.ini
+            - ${DOCKER_PHP_PATH}/docker-entrypoint.sh:/entrypoint.sh:ro
+            # - ${APP_PATH}:/var/www/app:delegated
+            # - type: volume
+            #   source: app_logs
+            #   target: /usr/local/var/log
+        environment:
+            APP_DOMAIN: ${APP_DOMAIN}
+        env_file:
+            - ${DOCKER_PHP_APP_PATH}/.env
+        restart: on-failure:3
+        # Graceful shutdown
+        stop_signal: SIGQUIT
+        stop_grace_period: 60s
+        networks:
+            app_network:
+            traefik_network:
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "1m"
+                max-file: "5"
+                mode: "non-blocking"
+                tag: "logging-app"
+        healthcheck:
+            test: php artisan octane:status || exit 1
+            start_period: 30s
+            interval: 30s
+            timeout: 3s
+            retries: 3
+        # # # docker-compose --compatibility up
+        # deploy:
+        #     resources:
+        #         limits:
+        #             cpus: '${APP_LIMITS_CPU:? Missing $APP_LIMITS_CPU env var}'
+        #             memory: ${APP_LIMITS_MEMORY}
+        #         reservations:
+        #             memory: ${APP_RESERVATIONS_MEMORY}
+        cap_drop:
+            - NET_ADMIN
+            - SYS_ADMIN

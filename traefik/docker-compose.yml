@@ -1,0 +1,158 @@
+version: '3.9'
+
+networks:
+    traefik_network:
+        external: true
+        name: ${TRAEFIK_DOCKER_NETWORK}
+
+services:
+
+    # docker compose \
+    # --verbose --compatibility \
+    # --env-file .env \
+    # -f traefik/docker-compose.yml \
+    #  up \
+    # --force-recreate --no-build --no-deps --detach \
+    # traefik
+    traefik:
+        image: traefik:v2.9
+        hostname: traefik
+        container_name: ${COMPOSE_PROJECT_NAME}_traefik
+        command:
+            # https://doc.traefik.io/traefik/operations/api/#configuration
+            - --api=true
+            - --api.dashboard=true
+            # https://doc.traefik.io/traefik/observability/logs/
+            - --log.filePath=/etc/traefik/traefik.log
+            - --log.level=${TRAEFIK_LOG_LEVEL:-INFO}
+            # https://doc.traefik.io/traefik/observability/access-logs/
+            # - --accesslog=true
+            # - --accesslog.filepath=/etc/traefik/access.log
+            # - --accesslog.format=json
+            # - --accesslog.bufferingsize=100
+            # - --accesslog.filters.statuscodes=200,300-302
+            # - --accesslog.filters.minduration=2ms
+            # - --accesslog.fields.defaultmode=keep
+            # - --accesslog.fields.names.StartUTC=drop
+            # - --accesslog.fields.headers.defaultmode=keep
+            # - --accesslog.fields.headers.names.User-Agent=redact
+            # - --accesslog.fields.headers.names.Authorization=drop
+            # - --accesslog.fields.headers.names.Content-Type=keep
+            # https://doc.traefik.io/traefik/providers/overview/
+            - --providers.providersthrottleduration=5s
+            # https://doc.traefik.io/traefik/providers/docker/
+            - --providers.docker=true
+            - --providers.docker.endpoint=unix:///var/run/docker.sock
+            - --providers.docker.exposedByDefault=false
+            - --providers.docker.network=${TRAEFIK_DOCKER_NETWORK}
+            - --providers.docker.swarmMode=false
+            - --providers.docker.watch=true
+            - --providers.docker.constraints=Label(`traefik.tags`, `public`)
+            # https://doc.traefik.io/traefik/providers/file/
+            - --providers.file.directory=/etc/traefik/dynamic
+            - --providers.file.watch=true
+            # Set up LetsEncrypt
+            - --certificatesresolvers.letsencrypt.acme.email=${CF_API_EMAIL}
+            - --certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/letsencrypt/acme.json
+            - --certificatesresolvers.letsencrypt.acme.caserver=${TRAEFIK_ACME_SERVER}
+            - --certificatesresolvers.letsencrypt.acme.certificatesDuration=2160
+            - --certificatesresolvers.letsencrypt.acme.keytype=RSA4096
+            - --certificatesresolvers.letsencrypt.acme.dnschallenge=true
+            - --certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare
+            - --certificatesresolvers.letsencrypt.acme.dnschallenge.delaybeforecheck=10
+            - --certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,1.0.0.1:53
+            # https://doc.traefik.io/traefik/routing/entrypoints/
+            - --entryPoints.web.address=:80
+            # - --entrypoints.web.http.redirections.entryPoint.to=websecure
+            # - --entrypoints.web.http.redirections.entryPoint.scheme=https
+            # - --entrypoints.web.http.redirections.entrypoint.permanent=true
+            - --entryPoints.websecure.address=:${EDGE_PORT_HTTPS:-443}
+            - --entryPoints.websecure.forwardedHeaders.trustedIPs=${TRAEFIK_FORWARDEDHEADERS_TRUSTEDIPS}
+            - --entryPoints.websecure.proxyProtocol.trustedIPs=${TRAEFIK_FORWARDEDHEADERS_TRUSTEDIPS}
+            - --entryPoints.websecure.http2.maxConcurrentStreams=500
+            - --entryPoints.websecure.transport.respondingTimeouts.writeTimeout=60s
+            - --entryPoints.websecure.transport.lifeCycle.requestAcceptGraceTimeout=10s
+            - --entryPoints.websecure.transport.lifeCycle.graceTimeOut=60s
+            # This section is about the default TLS configuration applied to all routers
+            # associated with the named entry point.This section is about the default TLS
+            # configuration applied to all routers associated with the named entry point.
+            # https://doc.traefik.io/traefik/routing/entrypoints/#tls
+            - --entrypoints.websecure.http.tls=true
+            - --entrypoints.websecure.http.tls.options=default
+            - --entrypoints.websecure.http.tls.certResolver=letsencrypt
+            - --entrypoints.websecure.http.tls.domains[0].main=${APP_DOMAIN}
+            - --entrypoints.websecure.http.tls.domains[0].sans=*.${APP_DOMAIN}
+            - --entrypoints.websecure.http.tls.domains[1].main=${APP_SECONDARY_DOMAIN}
+            - --entrypoints.websecure.http.tls.domains[1].sans=*.${APP_SECONDARY_DOMAIN}
+            - --experimental.plugins.cloudflare-real-ip.modulename=github.com/BetterCorp/cloudflarewarp
+            - --experimental.plugins.cloudflare-real-ip.version=v1.3.3
+            # https://doc.traefik.io/traefik/observability/metrics/prometheus/
+            - --entryPoints.metrics.address=:8888
+            - --metrics.prometheus=true
+            - --metrics.prometheus.entryPoint=metrics
+            - --metrics.prometheus.buckets=0.1,0.3,1.2,5.0
+        expose:
+            - 8888
+        ports:
+            - target: 80
+              published: ${EDGE_PORT_HTTP:-80}
+              protocol: tcp
+              mode: host
+            - target: 443
+              published: ${EDGE_PORT_HTTPS:-443}
+              protocol: tcp
+              mode: host
+            - 8888
+        environment:
+            HTTPS_PORT: ${EDGE_PORT_HTTPS:-443}
+            APP_DOMAIN: ${APP_DOMAIN}
+            APP_SECONDARY_DOMAIN: ${APP_SECONDARY_DOMAIN}
+            CF_API_EMAIL: ${CF_API_EMAIL}
+            CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN}
+        security_opt:
+            - "no-new-privileges:true" # https://docs.docker.com/engine/reference/run/#security-configuration
+        networks:
+            traefik_network:
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
+        # Graceful shutdown
+        stop_grace_period: 120s
+        volumes:
+            - /etc/localtime:/etc/localtime:ro
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+            - ./:/etc/traefik
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "5m"
+                max-file: "5"
+                mode: "non-blocking"
+                tag: "logging-traefik"
+
+    # docker compose \
+    # --verbose --compatibility \
+    # --env-file .env \
+    # -f traefik/docker-compose.yml \
+    # up \
+    # --force-recreate --no-build --no-deps \
+    # --scale traefik-whoami=2 \
+    # traefik-whoami
+    traefik-whoami:
+        image: traefik/whoami:v1.8
+        # $> make docker/service/up context=traefik without_version=true services="traefik-whoami"
+        container_name: ${COMPOSE_PROJECT_NAME}_traefik-whoami
+        # container_name: ${COMPOSE_PROJECT_NAME}-${CONTAINER_VERSION}_traefik-whoami
+        networks:
+            traefik_network:
+        labels:
+            - "traefik.enable=true"
+            - "traefik.tags=public"
+            - "traefik.http.routers.traefik-whoami-rtr.rule=Host(`whoami.${APP_DOMAIN}`)"
+            - "traefik.http.routers.traefik-whoami-rtr.entrypoints=websecure"
+            - "traefik.http.routers.traefik-whoami-rtr.service=traefik-whoami-svc"
+            - "traefik.http.middlewares.real-ip.plugin.cloudflare-real-ip.disableDefault=true"
+            - "traefik.http.middlewares.real-ip.plugin.cloudflare-real-ip.trustip=${TRAEFIK_FORWARDEDHEADERS_TRUSTEDIPS}"
+            - "traefik.http.routers.traefik-whoami-rtr.middlewares=real-ip@docker"
+            - "traefik.http.services.traefik-whoami-svc.loadbalancer.server.port=80"
+            - "traefik.http.services.traefik-whoami-svc.loadbalancer.server.scheme=http"
+            - "traefik.http.services.traefik-whoami-svc.loadbalancer.passhostheader=true"

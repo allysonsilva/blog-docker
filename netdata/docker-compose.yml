@@ -1,0 +1,93 @@
+version: '3.9'
+
+networks:
+    app_network:
+        external: true
+        name: ${APP_DOCKER_NETWORK}
+    traefik_network:
+        external: true
+        name: ${TRAEFIK_DOCKER_NETWORK}
+    dockerproxy_network:
+        driver: bridge
+        name: ${COMPOSE_PROJECT_NAME}_dockerproxy_network
+
+volumes:
+    netdatalib:
+    netdatacache:
+    netdataconfig:
+
+services:
+
+    netdata:
+        image: netdata/netdata:v1
+        hostname: monitoring.${APP_DOMAIN}
+        container_name: ${COMPOSE_PROJECT_NAME}_netdata
+        # ports:
+        #     - 19999
+        labels:
+            traefik.enable: true
+            traefik.tags: public
+            traefik.http.routers.netdata-rtr.rule: Host(`monitoring.${APP_DOMAIN}`)
+            traefik.http.routers.netdata-rtr.priority: 20
+            traefik.http.routers.netdata-rtr.entrypoints: websecure
+            traefik.http.routers.netdata-rtr.middlewares: management@file
+            traefik.http.routers.netdata-rtr.service: netdata-svc
+            traefik.http.services.netdata-svc.loadbalancer.server.port: 19999
+            traefik.http.services.netdata-svc.loadbalancer.server.scheme: http
+            traefik.http.services.netdata-svc.loadbalancer.passhostheader: true
+        cap_add:
+            - SYS_PTRACE
+        security_opt:
+            - apparmor:unconfined
+        volumes:
+            - netdataconfig:/etc/netdata
+            - netdatalib:/var/lib/netdata
+            - netdatacache:/var/cache/netdata
+            - /etc/passwd:/host/etc/passwd:ro
+            - /etc/group:/host/etc/group:ro
+            - /proc:/host/proc:ro
+            - /sys:/host/sys:ro
+            - /etc/os-release:/host/etc/os-release:ro
+            - ./configs/netdata.conf:/etc/netdata/netdata.conf:ro
+            - ./configs/orchestrators/go.d.conf:/etc/netdata/go.d.conf:ro
+            - ./configs/health.conf:/etc/netdata/health_alarm_notify.conf:ro
+            - ./configs/modules/go.d/:/etc/netdata/go.d/
+            - ./configs/alarms/:/etc/netdata/health.d/
+            - /etc/localtime:/etc/localtime:ro
+            - /etc/timezone:/etc/timezone:ro
+        environment:
+            - DO_NOT_TRACK=1
+            # Use $> VIRTUALIZATION=$(systemd-detect-virt -v) docker-compose up
+            - VIRTUALIZATION=${VIRTUALIZATION}
+            - DOCKER_HOST=dockerproxy:2375
+        networks:
+            app_network:
+            traefik_network:
+            dockerproxy_network:
+        restart: unless-stopped
+        depends_on: ['dockerproxy']
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "5"
+                mode: "non-blocking"
+                tag: "logging-netdata"
+        deploy:
+            resources:
+                limits:
+                    cpus: '1'
+                    memory: 1024M
+
+    dockerproxy:
+        image: tecnativa/docker-socket-proxy:0.1
+        hostname: dockerproxy
+        container_name: ${COMPOSE_PROJECT_NAME}_dockerproxy
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+        environment:
+            - NETWORKS=1
+            - SERVICES=1
+            - CONTAINERS=1
+        networks:
+            dockerproxy_network:

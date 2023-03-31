@@ -1,0 +1,25 @@
+---
+## DYNAMIC CONFIGURATION
+
+http:
+
+    routers:
+
+        traefik-ui-rtr:
+            rule: 'Host(`traefik.{{ env "APP_DOMAIN" }}`) && (PathPrefix(`/api/`) || PathPrefix(`/dashboard/`))'
+            priority: 99
+            service: api@internal
+            entrypoints:
+                - websecure
+            middlewares:
+                - management
+
+    middlewares:
+
+        traefik-headers:
+            headers:
+                stsSeconds: 31536000
+                browserXssFilter: true
+                contentTypeNosniff: true
+                customFrameOptionsValue: SAMEORIGIN
+                referrerPolicy: same-origin

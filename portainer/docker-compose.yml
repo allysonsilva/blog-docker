@@ -1,0 +1,48 @@
+version: '3.9'
+
+volumes:
+    portainer_data:
+
+networks:
+    traefik_network:
+        external: true
+        name: ${TRAEFIK_DOCKER_NETWORK}
+
+services:
+
+    portainer:
+        image: portainer/portainer-ce:2.17.0-alpine
+        hostname: portainer
+        container_name: ${COMPOSE_PROJECT_NAME}_portainer
+        command: -H unix:///var/run/docker.sock
+        labels:
+            traefik.enable: true
+            traefik.tags: public
+            traefik.http.routers.portainer-rtr.rule: Host(`portainer.${APP_DOMAIN}`)
+            traefik.http.routers.portainer-rtr.priority: 20
+            traefik.http.routers.portainer-rtr.entrypoints: websecure
+            traefik.http.routers.portainer-rtr.middlewares: management@file
+            traefik.http.routers.portainer-rtr.service: portainer-svc
+            traefik.http.services.portainer-svc.loadbalancer.server.port: 9000
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+            - /etc/localtime:/etc/localtime:ro
+            - /etc/timezone:/etc/timezone:ro
+            - type: volume
+              source: portainer_data
+              target: /data
+        restart: unless-stopped
+        networks:
+            traefik_network:
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "1m"
+                max-file: "5"
+                mode: "non-blocking"
+                tag: "logging-portainer"
+        deploy:
+            resources:
+                limits:
+                    cpus: '1'
+                    memory: 1024M

@@ -1,0 +1,42 @@
+version: '3.9'
+
+networks:
+    traefik_network:
+        external: true
+        name: ${TRAEFIK_DOCKER_NETWORK}
+
+volumes:
+    grafana:
+
+services:
+
+    grafana:
+        image: grafana/grafana:9.4.3
+        hostname: grafana
+        container_name: ${COMPOSE_PROJECT_NAME}_grafana
+        labels:
+            - "traefik.enable=true"
+            - "traefik.tags=public"
+            - "traefik.http.routers.grafana-rtr.rule=Host(`observability.${APP_DOMAIN}`)"
+            - "traefik.http.routers.grafana-rtr.entrypoints=websecure"
+            - "traefik.http.routers.grafana-rtr.service=grafana-svc"
+            - "traefik.http.services.grafana-svc.loadbalancer.server.port=3000"
+            - "traefik.http.services.grafana-svc.loadbalancer.server.scheme=http"
+            - "traefik.http.services.grafana-svc.loadbalancer.passhostheader=true"
+        env_file:
+            - .env
+        volumes:
+            - type: bind
+              source: ./datasources/
+              target: /etc/grafana/provisioning/datasources/
+              read_only: true
+            - type: volume
+              source: grafana
+              target: /var/lib/grafana
+        networks:
+            traefik_network:
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"

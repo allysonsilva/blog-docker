@@ -1,0 +1,13 @@
+---
+## DYNAMIC CONFIGURATION
+
+http:
+
+    services:
+
+        app-svc:
+            loadBalancer:
+                passHostHeader: true
+                servers:
+### APP_LOADBALANCER_SERVERS
+### APP_LOADBALANCER_SERVERS_END

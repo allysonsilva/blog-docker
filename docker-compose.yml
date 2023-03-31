@@ -1,0 +1,28 @@
+version: '3.9'
+
+networks:
+    app_network:
+        driver: bridge
+        name: ${APP_DOCKER_NETWORK}
+        ipam:
+            driver: default
+            config:
+                - subnet: 172.20.0.0/16
+
+    traefik_network:
+        driver: bridge
+        name: ${TRAEFIK_DOCKER_NETWORK}
+        ipam:
+            driver: default
+            config:
+                - subnet: 172.25.0.0/16
+
+services:
+
+    hello-world:
+        image: hello-world:latest
+        hostname: hello-world
+        container_name: ${COMPOSE_PROJECT_NAME}-${CONTAINER_VERSION}_hello-world
+        networks:
+            app_network:
+            traefik_network:

@@ -11,6 +11,9 @@ include scripts/envs/deploy.env
 export
 endif
 
+root_path := $(shell dirname -- `pwd`)
+docker_folder := $(if $(docker_folder),$(docker_folder),./docker)
+
 uname_OS := $(shell uname -s)
 user_UID := $(shell id -u)
 user_GID := $(shell id -g)
@@ -24,7 +27,6 @@ endif
 # Handling environment variables
 app_local_folder := $(if $(APP_LOCAL_FOLDER_SHELL),$(APP_LOCAL_FOLDER_SHELL),$(ROOT_PATH)/$(APP_LOCAL_FOLDER))
 
-docker_folder := $(if $(docker_folder),$(docker_folder),$(shell pwd))
 # Passing the >_ options option
 options := $(if $(options),$(options),--env-file $(docker_folder)/.env)
 # Passing the >_ up_options option
@@ -60,12 +62,13 @@ endef
 
 .PHONY: docker/config-env
 docker/config-env:
-	@cd docker && cp -n .env.compose .env || true
-	@cd docker && sed -i "/^# PWD/c\PWD=$(shell pwd)" .env
-	@cd docker && sed -i "/^# ROOT_PATH/c\ROOT_PATH=$(shell pwd)" .env
-	@cd docker && sed -i "/# USER_UID=.*/c\USER_UID=$(user_UID)" .env
-	@cd docker && sed -i "/# USER_GID=.*/c\USER_GID=$(user_GID)" .env
-	@cd docker && sed -i "/^# CURRENT_UID/c\CURRENT_UID=${current_uid}" .env
+	@cp -n .env.compose .env || true
+	@sed -i "/^# PWD/c\PWD=$(shell pwd)" .env
+	@sed -i "/LOCAL_DOCKER_FOLDER=.*/c\LOCAL_DOCKER_FOLDER=${docker_folder}" .env
+	@sed -i "/^# ROOT_PATH/c\ROOT_PATH=$(root_path)" .env
+	@sed -i "/# USER_UID=.*/c\USER_UID=$(user_UID)" .env
+	@sed -i "/# USER_GID=.*/c\USER_GID=$(user_GID)" .env
+	@sed -i "/^# CURRENT_UID/c\CURRENT_UID=${current_uid}" .env
 	@echo
 	@echo $(call message_success, Run \`make docker/config-env\` successfully executed)
 

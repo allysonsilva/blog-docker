@@ -11,7 +11,7 @@ volumes:
 services:
 
     queue:
-        image: ${QUEUE_IMAGE}
+        image: ${QUEUE_DOCKER_IMAGE}
         hostname: ${COMPOSE_PROJECT_NAME}_queue
         container_name: ${COMPOSE_PROJECT_NAME}-${CONTAINER_VERSION}_queue
         env_file:
@@ -20,7 +20,7 @@ services:
         volumes:
             - ${DOCKER_PHP_PATH}/configs/queue/supervisord.conf:/etc/supervisor/supervisord.conf:ro
             - ${DOCKER_PHP_PATH}/docker-entrypoint.sh:/entrypoint.sh:ro
-            # - ${ROOT_PATH}:/var/www/app:delegated
+            # - ${APP_PATH}:/var/www/app:delegated
             - type: volume
               source: queue_logs
               target: /usr/local/var/log

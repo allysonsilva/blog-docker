@@ -56,6 +56,19 @@ install_composer_dependencies() {
     fi
 }
 
+app_entrypoint() {
+    php artisan app:generate-feed || true
+    php artisan app:generate-sitemap || true
+
+    npm --section=site run mix-production || true
+
+    php artisan app:generate-partials-shell --no-interaction || true
+
+    npm run workbox-precache || true
+
+    npm --section=combine run mix-production || true
+}
+
 # $> {view:clear} && {cache:clear} && {route:clear} && {config:clear} && {clear-compiled}
 # @see https://github.com/laravel/framework/blob/9.x/src/Illuminate/Foundation/Console/OptimizeClearCommand.php
 if [[ -d "vendor" && ${FORCE_CLEAR:-false} == true ]]; then
@@ -115,6 +128,8 @@ php --ini
 if [ "$CONTAINER_ROLE" = "APP" ]; then
 
     printf "\033[34m[$CONTAINER_ROLE] Running with Laravel Octane ...\033[0m\n"
+
+    app_entrypoint
 
     exec /usr/local/bin/php -d variables_order=EGPCS artisan octane:start --server=swoole --max-requests=100000 --host=0.0.0.0 --port=8000
 

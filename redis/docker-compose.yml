@@ -11,6 +11,8 @@ volumes:
 
 services:
 
+    # docker exec -it company_redis redis-cli -n 0 -p 6379
+    # 127.0.0.1:6379> AUTH "YOUR_REDIS_PASSWORD"
     redis:
         image: redis:7.0-alpine
         hostname: redis
@@ -22,7 +24,7 @@ services:
         volumes:
             - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
             - redis_data:/data
-        command: ["redis-server", "/usr/local/etc/redis/redis.conf", "--bind", "0.0.0.0", "--requirepass", "YOUR_REDIS_PASSWORD"]
+        command: ["redis-server", "/usr/local/etc/redis/redis.conf", "--bind", "0.0.0.0"]
         networks:
             app_network:
         healthcheck:

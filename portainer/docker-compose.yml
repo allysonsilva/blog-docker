@@ -20,7 +20,7 @@ services:
             traefik.tags: public
             traefik.http.routers.portainer-rtr.priority: 20
             traefik.http.routers.portainer-rtr.entrypoints: websecure
-            traefik.http.routers.portainer-rtr.rule: Host(`portainer.${DOMAIN}`)
+            traefik.http.routers.portainer-rtr.rule: Host(`portainer.${APP_DOMAIN}`)
             traefik.http.routers.portainer-rtr.service: portainer-svc
             traefik.http.services.portainer-svc.loadbalancer.server.port: 9000
             traefik.http.routers.portainer-rtr.middlewares: management@file

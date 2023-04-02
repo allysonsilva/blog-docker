@@ -7,6 +7,7 @@
 
 docker*
 !docker/php/configs
+!docker/mysql/ssl
 !docker/php/docker-entrypoint.sh
 
 **/vendor
@@ -23,7 +24,6 @@ docker*
 **/.styleci.yml
 **/.editorconfig
 **/bootstrap/cache/*
-**/storage/app/*
 **/storage/framework/cache/*
 **/storage/framework/sessions/*
 **/storage/framework/testing/*

@@ -27,14 +27,14 @@ services:
         labels:
             traefik.enable: true
             traefik.tags: public
-            traefik.http.routers.netdata-rtr.rule: Host(`netdata.${APP_DOMAIN}`)
+            traefik.http.routers.netdata-rtr.rule: Host(`monitoring.${APP_DOMAIN}`)
             traefik.http.routers.netdata-rtr.priority: 20
             traefik.http.routers.netdata-rtr.entrypoints: websecure
             traefik.http.routers.netdata-rtr.service: netdata-svc
             traefik.http.routers.netdata-rtr.middlewares: management@file
             traefik.http.services.netdata-svc.loadbalancer.server.port: 19999
             traefik.http.services.netdata-svc.loadbalancer.server.scheme: http
-            traefik.http.services.netdata-svc.loadbalancer.server.passhostheader: true
+            traefik.http.services.netdata-svc.loadbalancer.passhostheader: true
         cap_add:
             - SYS_PTRACE
         security_opt:

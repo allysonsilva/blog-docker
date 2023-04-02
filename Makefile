@@ -11,8 +11,7 @@ include scripts/envs/deploy.env
 export
 endif
 
-root_path := $(shell dirname -- `pwd`)
-docker_folder := $(if $(docker_folder),$(docker_folder),./docker)
+docker_path := $(shell realpath $(DOCKER_PATH))
 
 uname_OS := $(shell uname -s)
 user_UID := $(shell id -u)
@@ -25,10 +24,10 @@ ifeq ($(uname_OS),Darwin)
 endif
 
 # Handling environment variables
-app_local_folder := $(if $(APP_LOCAL_FOLDER_SHELL),$(APP_LOCAL_FOLDER_SHELL),$(ROOT_PATH)/$(APP_LOCAL_FOLDER))
+app_full_path := $(if $(APP_PATH_SHELL),$(APP_PATH_SHELL),$(APP_PATH))
 
 # Passing the >_ options option
-options := $(if $(options),$(options),--env-file $(docker_folder)/.env)
+options := $(if $(options),$(options),--env-file $(docker_path)/.env)
 # Passing the >_ up_options option
 up_options := $(if $(up_options),$(up_options),--force-recreate --no-build --no-deps --detach)
 
@@ -36,8 +35,10 @@ up_options := $(if $(up_options),$(up_options),--force-recreate --no-build --no-
 project_name := $(if $(project_name),$(project_name),$(COMPOSE_PROJECT_NAME))
 version := $(if $(version),$(version),$(if $(CONTAINER_VERSION_SHELL),$(CONTAINER_VERSION_SHELL),$(CONTAINER_VERSION)))
 
+project_name_and_version := $(if $(with_version),$(project_name)-$(version),$(project_name))
+
 # Passing the >_ common_options option
-common_options := $(if $(common_options),$(common_options),--compatibility --ansi=auto --project-name $(project_name)-$(version))
+common_options := $(if $(common_options),$(common_options),--compatibility --ansi=auto --project-name $(project_name_and_version))
 
 # ==================================================================================== #
 # HELPERS
@@ -64,28 +65,27 @@ endef
 docker/config-env:
 	@cp -n .env.compose .env || true
 	@sed -i "/^# PWD/c\PWD=$(shell pwd)" .env
-	@sed -i "/LOCAL_DOCKER_FOLDER=.*/c\LOCAL_DOCKER_FOLDER=${docker_folder}" .env
-	@sed -i "/^# ROOT_PATH/c\ROOT_PATH=$(root_path)" .env
+	@sed -i "/^# APP_PATH/c\APP_PATH=$(shell dirname -- `pwd`)" .env
 	@sed -i "/# USER_UID=.*/c\USER_UID=$(user_UID)" .env
 	@sed -i "/# USER_GID=.*/c\USER_GID=$(user_GID)" .env
 	@sed -i "/^# CURRENT_UID/c\CURRENT_UID=${current_uid}" .env
 	@echo
-	@echo $(call message_success, Run \`make docker/config-env\` successfully executed)
+	@echo -e $(call message_success, Run \`make docker/config-env\` successfully executed)
 
 # make php/composer-install
 .PHONY: php/composer-install
 php/composer-install:
 	@echo
-	@echo $(call message_info, Installing PHP dependencies with Composer 🗂)
+	@echo -e $(call message_info, Installing PHP dependencies with Composer 🗂)
 	@echo
 	docker run \
 		--rm \
 		--tty \
 		--interactive \
-		--volume $(app_local_folder):/app \
+		--volume $(app_full_path):/app \
 		--workdir /app \
 		$(if $(options), $(options),) \
-		composer:2.0 \
+		composer:2.5 \
 			install \
 				--optimize-autoloader \
 				--ignore-platform-reqs \
@@ -95,8 +95,8 @@ php/composer-install:
 				--no-interaction
 
 .PHONY: docker/healthcheck
-docker/healthcheck:
-	@timeout=60; counter=0; \
+docker/healthcheck: $(eval SHELL:=/bin/bash)
+	@timeout=90; counter=0; \
 	printf "\n\033[3;33mEsperando healthcheck do container de \"$${container}\" = \"healthy\" ⏳ \033[0m\n" ; \
 	until [[ "$$(docker container inspect -f '{{.State.Health.Status}}' $${container})" == "healthy" ]] ; do \
 		printf '.' ; \
@@ -109,81 +109,132 @@ docker/healthcheck:
 		sleep 5s; counter=$$((counter + 5)) ; \
 	done
 	@echo
-	@echo $(call message_success, HEALTHCHECK do Container \"$${container}\" OK)
+	@echo -e $(call message_success, HEALTHCHECK do Container \"$${container}\" OK)
+
+# .PHONY: docker/app/build
+# docker/app/build:
+# 	@echo
+# 	@echo -e $(call message_info, Build an image APP... 🏗)
+# 	@echo
+# 	docker compose \
+# 		-f $(docker_path)/php/services/app/docker-compose.yml \
+# 		--ansi=auto \
+# 		--env-file $(docker_path)/.env \
+# 		build --progress=plain app
 
 .PHONY: docker/app/build
 docker/app/build:
 	@echo
-	@echo $(call message_info, Build an image APP... 🏗)
+	@echo -e $(call message_info, Build an image APP... 🏗)
+	docker build \
+		--progress=plain \
+		--cache-from ${APP_DOCKER_REPO}:vendor \
+		--cache-from ${APP_DOCKER_REPO}:frontend \
+		--cache-from ${APP_DOCKER_IMAGE} \
+		--tag ${APP_DOCKER_IMAGE} \
+		--file ${DOCKER_PHP_PATH}/Dockerfile \
+		--build-arg USER_UID=${USER_UID} \
+		--build-arg USER_GID=${USER_GID} \
+		--build-arg DOCKER_FOLDER=${DOCKER_FOLDER} \
+	${APP_PATH}
+
+.PHONY: docker/app/vendor/build
+docker/app/vendor/build: $(eval SHELL:=/bin/bash)
 	@echo
-	docker compose \
-		-f $(docker_folder)/php/services/app/docker-compose.yml \
-		--ansi=auto \
-		--env-file $(docker_folder)/.env \
-		build --progress=plain app
+	@echo -e $(call message_info, Creating the VENDOR image of the application 🏗)
+	@CACHE_FROM="--cache-from ${APP_DOCKER_REPO}:vendor"; \
+	if [ "$${no_cache_from:-false}" = "true" ]; then \
+		CACHE_FROM="" ; \
+	fi ; \
+	docker build \
+		--progress=plain \
+		--target vendor \
+		$$CACHE_FROM \
+		--tag ${APP_DOCKER_REPO}:vendor \
+		--file ${DOCKER_PHP_PATH}/Dockerfile \
+		--build-arg DOCKER_FOLDER=${DOCKER_FOLDER} \
+	${APP_PATH}
+
+.PHONY: docker/app/frontend/build
+docker/app/frontend/build: $(eval SHELL:=/bin/bash)
+	@echo
+	@echo -e $(call message_info, Creating the FRONT-END image of the application 🏗)
+	@CACHE_FROM="--cache-from ${APP_DOCKER_REPO}:frontend"; \
+	if [ "$${no_cache_from:-false}" = "true" ]; then \
+		CACHE_FROM="" ; \
+	fi ; \
+	docker build \
+		--progress=plain \
+		--target frontend \
+		$$CACHE_FROM \
+		--tag ${APP_DOCKER_REPO}:frontend \
+		--file ${DOCKER_PHP_PATH}/Dockerfile \
+		--build-arg DOCKER_FOLDER=${DOCKER_FOLDER} \
+	${APP_PATH}
 
 .PHONY: docker/app/pull
 docker/app/pull:
 	@echo
-	@echo $(call message_info, Pull an image APP... 🏗)
+	@echo -e $(call message_info, Pull an image APP... 🏗)
 	@echo
 	docker compose \
-		-f $(docker_folder)/php/services/app/docker-compose.yml \
+		-f $(docker_path)/php/services/app/docker-compose.yml \
 		--ansi=auto \
-		--env-file $(docker_folder)/.env \
+		--env-file $(docker_path)/.env \
 		pull app
 
 .PHONY: docker/app/up
 docker/app/up:
-# make -f docker/Makefile docker/app/up
 	@echo
-	@echo $(call message_info, Running APP Container... 🚀)
+	@echo -e $(call message_info, Running APP Container... 🚀)
 	@echo
-	$(MAKE) -f $(docker_folder)/Makefile \
+	$(MAKE) -f $(docker_path)/Makefile \
 			--no-print-directory \
 			docker/service/up \
 			context="php/services/app" \
-			scale=$(if $(num_scale),$(num_scale),$(if $(APP_DOCKER_SCALE),$(APP_DOCKER_SCALE),1)) \
+			scale=$(if $(num_scale),$(num_scale),$(if $(APP_NUM_SCALE),$(APP_NUM_SCALE),1)) \
 			service=$(if $(scale_service),$(scale_service),app) \
+			with_version=true \
 			version=$(if $(new_version),$(new_version),$(version))
-
-.PHONY: docker/minio/up
-docker/minio/up:
-# make -f docker/Makefile docker/minio/up
-	@echo
-	@echo $(call message_info, Running MinIO Container... 🗄)
-	@echo
-	@$(MAKE) -f $(docker_folder)/Makefile --no-print-directory docker/service/up context="minio"
 
 .PHONY: docker/queue/up
 docker/queue/up:
-# make -f docker/Makefile docker/queue/up
 	@echo
-	@echo $(call message_info, Running QUEUE Container... 🚀)
+	@echo -e $(call message_info, Running QUEUE Container... 🚀)
 	@echo
-	@$(MAKE) -f $(docker_folder)/Makefile --no-print-directory docker/service/up context="php/services/queue"
+	@$(MAKE) -f $(docker_path)/Makefile --no-print-directory docker/service/up context="php/services/queue"
 
 .PHONY: docker/scheduler/up
 docker/scheduler/up:
-# make -f docker/Makefile docker/scheduler/up
 	@echo
-	@echo $(call message_info, Running SCHEDULER Container... 🚀)
+	@echo -e $(call message_info, Running SCHEDULER Container... 🚀)
 	@echo
-	@$(MAKE) -f $(docker_folder)/Makefile --no-print-directory docker/service/up context="php/services/scheduler"
+	@$(MAKE) -f $(docker_path)/Makefile --no-print-directory docker/service/up context="php/services/scheduler"
 
 .PHONY: docker/database/up
 docker/database/up:
 	@echo
-	@echo $(call message_info, Running Docker Database... 🚀)
+	@echo -e $(call message_info, Running Docker Database... 🚀)
 	@echo
-	@$(MAKE) -f $(docker_folder)/Makefile --no-print-directory docker/service/up context=mysql up_options="--force-recreate --detach"
+	@$(MAKE) -f $(docker_path)/Makefile --no-print-directory docker/service/up context=mysql up_options="--force-recreate --detach"
 
 .PHONY: docker/redis/up
 docker/redis/up:
 	@echo
-	@echo $(call message_info, Running Docker Redis... 🚀)
+	@echo -e $(call message_info, Running Docker Redis... 🚀)
 	@echo
-	@$(MAKE) -f $(docker_folder)/Makefile --no-print-directory docker/service/up context=redis up_options="--force-recreate --detach"
+	@$(MAKE) -f $(docker_path)/Makefile --no-print-directory docker/service/up context=redis up_options="--force-recreate --detach"
+
+.PHONY: docker/traefik/up
+docker/traefik/up:
+	@echo
+	@echo -e $(call message_info, Running Traefik Container... 🚀)
+	@echo
+	@$(MAKE) -f $(docker_path)/Makefile \
+			--no-print-directory \
+			docker/service/up \
+			context="traefik" \
+			services="traefik"
 
 # make  docker/service/up \
 		context=FOLDER_IN_SERVICES \
@@ -192,7 +243,7 @@ docker/redis/up:
 		services="services_in_docker_compose"
 .PHONY: docker/service/up
 docker/service/up:
-	@docker compose -f $(docker_folder)/$(context)/docker-compose.yml \
+	@docker compose -f $(docker_path)/$(context)/docker-compose.yml \
 		$(options) $(common_options) \
 		up $(up_options) \
 		$(if $(and $(scale), $(service)),--scale $(service)=$(scale)) $(if $(services),$(services),)
@@ -201,11 +252,11 @@ docker/service/up:
 docker/up:
 # make -f docker/Makefile docker/up database_container="app_database" redis_container="app_redis"
 	@echo
-	@echo $(call message_info, Running Docker Application... 🚀)
+	@echo -e $(call message_info, Running Docker Application... 🚀)
 	@echo
-	@docker compose -f $(docker_folder)/docker-compose.yml up
-	@$(MAKE) -f $(docker_folder)/Makefile --no-print-directory docker/database/up
-	@$(MAKE) -f $(docker_folder)/Makefile --no-print-directory docker/healthcheck container=$(if $(database_container),$(database_container),app_database)
-	@$(MAKE) -f $(docker_folder)/Makefile --no-print-directory docker/redis/up
-	@$(MAKE) -f $(docker_folder)/Makefile --no-print-directory docker/healthcheck container=$(if $(redis_container),$(redis_container),app_redis)
-	@$(MAKE) -f $(docker_folder)/Makefile --no-print-directory docker/app/up
+	@docker compose -f $(docker_path)/docker-compose.yml up
+	@$(MAKE) -f $(docker_path)/Makefile --no-print-directory docker/database/up
+	@$(MAKE) -f $(docker_path)/Makefile --no-print-directory docker/healthcheck container=$(if $(database_container),$(database_container),app_database)
+	@$(MAKE) -f $(docker_path)/Makefile --no-print-directory docker/redis/up
+	@$(MAKE) -f $(docker_path)/Makefile --no-print-directory docker/healthcheck container=$(if $(redis_container),$(redis_container),app_redis)
+	@$(MAKE) -f $(docker_path)/Makefile --no-print-directory docker/app/up

@@ -7,7 +7,7 @@ networks:
         ipam:
             driver: default
             config:
-                - subnet: 172.20.0.0/16
+                - subnet: 172.20.1.0/24
 
     traefik_network:
         driver: bridge
@@ -15,7 +15,7 @@ networks:
         ipam:
             driver: default
             config:
-                - subnet: 172.25.0.0/16
+                - subnet: 172.20.2.0/24
 
 services:
 

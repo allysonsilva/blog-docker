@@ -20,7 +20,7 @@ http:
                 - with-compress@file
 
         webmin-rtr:
-            rule: 'Host(`webmin.{{ env "APP_DOMAIN" }}`)'
+            rule: 'Host(`server.{{ env "APP_DOMAIN" }}`)'
             service: webmin-svc
             priority: 20
             entrypoints:

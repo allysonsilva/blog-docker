@@ -1,18 +1,12 @@
 #!/usr/bin/env bash
 
-# time ./scripts/DEPLOY.sh
-# @see HTTPie(https://httpie.io/)
+# time ./scripts/deploy-new-version.sh
 
 # This will cause the script to exit on the first error
 set -e
 
 if ! [ -x "$(command -v docker)" ]; then
     printf "\n\033[31m[DEPLOY] ERROR: docker is not installed!\033[0m\n\n" >&2
-    exit 1
-fi
-
-if ! [ -x "$(command -v docker compose)" ]; then
-    printf "\n\033[31m[DEPLOY] ERROR: docker compose is not installed!\033[0m\n\n" >&2
     exit 1
 fi
 
@@ -23,7 +17,7 @@ set +o allexport
 
 container_state()
 {
-    local options containers=() timeout=60
+    local options containers=() timeout=90
 
     # options may be followed by one colon to indicate they have a required argument
     if ! options=$(getopt --longoptions "containers:,timeout::" --options "c:t::" --alternative -- "$@")
@@ -115,7 +109,7 @@ usage()
     echo
     echo -e "\t\033[3;32m-d, -app-docker-image,      --app-docker-image\033[0m
                     - Imagem docker que será utilizada no \033[1m$> docker pull\033[0m do container da aplicação
-                    \033[1mDefault\033[0m: \033[3;32mVariável de ambiente definido em \$APP_IMAGE\033[0m"
+                    \033[1mDefault\033[0m: \033[3;32mVariável de ambiente definido em \$APP_DOCKER_IMAGE\033[0m"
 
     echo
     echo -e "\t \033[1mExemplos:\033[0m"
@@ -151,7 +145,6 @@ printf "\n\033[36m[DEPLOY] Script started on $(date +"%d/%m/%Y %T") ⏳\033[0m\n
 # Default values of arguments
 NEW_VERSION=${NEW_VERSION:-}
 NUM_APP_SCALE=${NUM_APP_SCALE:-}
-APP_DOCKER_IMAGE=${APP_DOCKER_IMAGE:-${APP_IMAGE}}
 
 PHP_CONTAINER_NAME=${PHP_CONTAINER_NAME:-"^/${COMPOSE_PROJECT_NAME}-v(?:[0-9]+)_app_(?:-\d+)?"}
 
@@ -213,11 +206,11 @@ ${MAKE_APP} docker/app/pull
 printf "\n\033[3;33m[DEPLOY] Executando serviços Docker APP/PHP-Laravel 🐳 - VERSÃO: ${NEXT_VERSION} \033[0m\n"
 
 export CONTAINER_VERSION_SHELL=${NEXT_VERSION}
-make docker/app/up num_scale=${NUM_APP_SCALE}
+make docker/app/up num_scale=${NUM_APP_SCALE} with_version=true
 
 readarray -t NEW__PHP_CONTAINERS < <(docker ps -q --filter name="${NEW_PHP_CONTAINER_NAME}" --filter status=running --no-trunc --format="{{.Names}}")
 
-container_state --timeout=60 --containers="${NEW__PHP_CONTAINERS[*]}"
+container_state --timeout=90 --containers="${NEW__PHP_CONTAINERS[*]}"
 
 containersInTraefik=''
 for containerName in ${NEW__PHP_CONTAINERS[@]}; do
@@ -229,11 +222,10 @@ sed -i -e "/### APP_LOADBALANCER_SERVERS/,/### APP_LOADBALANCER_SERVERS_END/c\##
 
 printf "\n\e[42;3;30m[DEPLOY] Serviço Traefik \"app-svc\" atualizado com sucesso com os novos containers APP/Laravel! 🚀 \e[0m\n"
 
-sleep 10s
+sleep 5s
 
-curl https://${APP_DOMAIN} >/dev/null 2>&1 || true
-
-sleep 2s
+# curl https://${APP_DOMAIN} >/dev/null 2>&1 || true
+# sleep 2s
 
 if [[ ${WITH_NETDATA:-false} == true ]]; then
     FILE_NETDATA_CONF="./netdata/configs/netdata.conf"

@@ -10,6 +10,7 @@ http:
                 middlewares:
                     - HSTS-headers
                     - secure-headers
+                    - real-ip@docker
 
         management:
             chain:
@@ -67,9 +68,9 @@ http:
                 referrerPolicy: same-origin
                 customFrameOptionsValue: SAMEORIGIN
                 # ContentSecurityPolicy: "default-src * 'self' https: data: blob: 'unsafe-inline' 'unsafe-hashes' 'unsafe-eval'; upgrade-insecure-requests;"
-                PermissionsPolicy: >-
-                    camera 'none'; geolocation 'none'; microphone 'none'; payment 'none';
-                    usb 'none'; midi 'none'; interest-cohort 'none'; fullscreen 'self';
+                # PermissionsPolicy: >-
+                #     camera 'none'; geolocation 'none'; microphone 'none'; payment 'none';
+                #     usb 'none'; midi 'none'; interest-cohort 'none'; fullscreen 'self';
                 customResponseHeaders:
                     # X-Robots-Tag: "none,noarchive,nosnippet,notranslate,noimageindex,"
                     server: ""

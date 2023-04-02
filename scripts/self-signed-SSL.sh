@@ -10,7 +10,7 @@ set -e
 
 # ./scripts/self-signed-SSL.sh --service=mongodb --cert-ca-pass=keypassword --cert-server-pass=keypassword --cert-server-host="mongodb.yourdomain.tld"
 # ./scripts/self-signed-SSL.sh --service=redis --cert-ca-pass=keypassword --cert-server-pass=keypassword --with-dhparam
-# ./scripts/self-signed-SSL.sh --service=mysql --cert-server-host=mysql.yourdomain.tld
+# ./scripts/self-signed-SSL.sh --service=mysql --cert-server-host=mysql
 
 printf "\n"
 printf "\033[36m=================================================\033[0m\n"
@@ -146,7 +146,7 @@ SUBJECT_ALTERNATIVE_NAME="subjectAltName=DNS:${DNS_ADDRESS},DNS:localhost,IP:${I
 openssl req -new -sha256 -nodes \
         -key server-key.pem -out server.csr \
         $CERT_SERVER_KEY_PASSWORD_PARAMETER \
-        -subj "${COMMON_SUBJECT}/OU=server/CN=`hostname`" \
+        -subj "${COMMON_SUBJECT}/OU=server/CN=${DNS_ADDRESS}" \
         -addext "$SUBJECT_ALTERNATIVE_NAME"
 
 # Generate the Server Certificate

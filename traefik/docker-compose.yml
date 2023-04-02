@@ -17,7 +17,7 @@ services:
     traefik:
         image: traefik:v2.9
         hostname: traefik
-        container_name: ${COMPOSE_PROJECT_NAME}-traefik
+        container_name: ${COMPOSE_PROJECT_NAME}_traefik
         command:
             # https://doc.traefik.io/traefik/operations/api/#configuration
             - --api=true
@@ -68,6 +68,7 @@ services:
             # - --entrypoints.web.http.redirections.entrypoint.permanent=true
             - --entryPoints.websecure.address=:${EDGE_PORT_HTTPS:-443}
             - --entryPoints.websecure.forwardedHeaders.trustedIPs=${TRAEFIK_FORWARDEDHEADERS_TRUSTEDIPS}
+            - --entryPoints.websecure.proxyProtocol.trustedIPs=${TRAEFIK_FORWARDEDHEADERS_TRUSTEDIPS}
             - --entryPoints.websecure.http2.maxConcurrentStreams=500
             - --entryPoints.websecure.transport.respondingTimeouts.writeTimeout=60s
             - --entryPoints.websecure.transport.lifeCycle.requestAcceptGraceTimeout=10s
@@ -83,6 +84,8 @@ services:
             - --entrypoints.websecure.http.tls.domains[0].sans=*.${APP_DOMAIN}
             - --entrypoints.websecure.http.tls.domains[1].main=${APP_SECONDARY_DOMAIN}
             - --entrypoints.websecure.http.tls.domains[1].sans=*.${APP_SECONDARY_DOMAIN}
+            - --experimental.plugins.cloudflare-real-ip.modulename=github.com/BetterCorp/cloudflarewarp
+            - --experimental.plugins.cloudflare-real-ip.version=v1.3.3
             # https://doc.traefik.io/traefik/observability/metrics/prometheus/
             - --entryPoints.metrics.address=:8888
             - --metrics.prometheus=true
@@ -101,7 +104,6 @@ services:
               mode: host
             - 8888
         environment:
-            TZ: ${TIME_ZONE:-America/Fortaleza}
             HTTPS_PORT: ${EDGE_PORT_HTTPS:-443}
             APP_DOMAIN: ${APP_DOMAIN}
             APP_SECONDARY_DOMAIN: ${APP_SECONDARY_DOMAIN}
@@ -111,6 +113,8 @@ services:
             - "no-new-privileges:true" # https://docs.docker.com/engine/reference/run/#security-configuration
         networks:
             traefik_network:
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
         # Graceful shutdown
         stop_grace_period: 120s
         volumes:
@@ -135,7 +139,9 @@ services:
     # traefik-whoami
     traefik-whoami:
         image: traefik/whoami:v1.8
-        # container_name: ${COMPOSE_PROJECT_NAME}-traefik-whoami-${CONTAINER_VERSION}
+        # $> make docker/service/up context=traefik without_version=true services="traefik-whoami"
+        container_name: ${COMPOSE_PROJECT_NAME}_traefik-whoami
+        # container_name: ${COMPOSE_PROJECT_NAME}-${CONTAINER_VERSION}_traefik-whoami
         networks:
             traefik_network:
         labels:
@@ -144,6 +150,9 @@ services:
             - "traefik.http.routers.traefik-whoami-rtr.rule=Host(`whoami.${APP_DOMAIN}`)"
             - "traefik.http.routers.traefik-whoami-rtr.entrypoints=websecure"
             - "traefik.http.routers.traefik-whoami-rtr.service=traefik-whoami-svc"
+            - "traefik.http.middlewares.real-ip.plugin.cloudflare-real-ip.disableDefault=true"
+            - "traefik.http.middlewares.real-ip.plugin.cloudflare-real-ip.trustip=${TRAEFIK_FORWARDEDHEADERS_TRUSTEDIPS}"
+            - "traefik.http.routers.traefik-whoami-rtr.middlewares=real-ip@docker"
             - "traefik.http.services.traefik-whoami-svc.loadbalancer.server.port=80"
             - "traefik.http.services.traefik-whoami-svc.loadbalancer.server.scheme=http"
             - "traefik.http.services.traefik-whoami-svc.loadbalancer.passhostheader=true"

@@ -12,7 +12,7 @@ services:
 
     scheduler:
         user: root
-        image: ${SCHEDULER_IMAGE}
+        image: ${SCHEDULER_DOCKER_IMAGE}
         hostname: ${COMPOSE_PROJECT_NAME}_scheduler
         container_name: ${COMPOSE_PROJECT_NAME}-${CONTAINER_VERSION}_scheduler
         env_file:
@@ -20,7 +20,7 @@ services:
             - ${DOCKER_PHP_SCHEDULER_PATH}/.env.container
         volumes:
             - ${DOCKER_PHP_PATH}/docker-entrypoint.sh:/entrypoint.sh:ro
-            # - ${ROOT_PATH}:/var/www/app:delegated
+            # - ${APP_PATH}:/var/www/app:delegated
             - type: volume
               source: scheduler_logs
               target: /usr/local/var/log

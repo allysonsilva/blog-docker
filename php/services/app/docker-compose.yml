@@ -15,19 +15,18 @@ networks:
 services:
 
     app:
-        image: ${APP_IMAGE:-app/app:1.0}
+        image: ${APP_DOCKER_IMAGE:-app/app:1.0}
         # hostname: ${COMPOSE_PROJECT_NAME}-${CONTAINER_VERSION}_app
         # container_name: ${COMPOSE_PROJECT_NAME}-${CONTAINER_VERSION}_app
         # # docker compose -f docker/php/services/app/docker-compose.yml --ansi=auto --env-file docker/.env build --progress=plain app
         build:
-            context: ${ROOT_PATH}
+            context: ${APP_PATH}
             dockerfile: ${DOCKER_PHP_PATH}/Dockerfile
             args:
                 APP_ENV: production
                 USER_UID: ${USER_UID}
                 USER_GID: ${USER_GID}
-                LOCAL_APP_FOLDER: ${APP_LOCAL_FOLDER}
-                LOCAL_DOCKER_FOLDER: ${LOCAL_DOCKER_FOLDER}
+                DOCKER_FOLDER: ${DOCKER_FOLDER}
         # labels:
         #     traefik.enable: true
         #     traefik.tags: public
@@ -42,12 +41,14 @@ services:
         #     traefik.http.services.app-svc.loadbalancer.healthcheck.timeout: 2s
         volumes:
             # - ${DOCKER_PHP_PATH}/configs/conf.d/opcache.ini:/usr/local/etc/php/conf.d/docker-php-ext-opcache.ini
+            # - ${DOCKER_PHP_PATH}/configs/php-local.ini:/usr/local/etc/php/php.ini
             - ${DOCKER_PHP_PATH}/docker-entrypoint.sh:/entrypoint.sh:ro
-            - ${DOCKER_PHP_PATH}/configs/php-local.ini:/usr/local/etc/php/php.ini
-            # - ${ROOT_PATH}:/var/www/app:delegated
+            # - ${APP_PATH}:/var/www/app:delegated
             # - type: volume
             #   source: app_logs
             #   target: /usr/local/var/log
+        environment:
+            APP_DOMAIN: ${APP_DOMAIN}
         env_file:
             - ${DOCKER_PHP_APP_PATH}/.env.container
         restart: on-failure:3

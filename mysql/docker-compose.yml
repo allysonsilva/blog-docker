@@ -21,7 +21,7 @@ services:
 
     # mysql \
     #   -h 127.0.0.1 \
-    #   -P {PORT TCP/3306} -uadmin -ppassw0rd1 \
+    #   -P {PORT TCP/3306} -uadmin -pPa55w0rd \
     #   --ssl-ca=mysql/ssl/ca.pem \
     #   --ssl-key=mysql/ssl/client-key.pem \
     #   --ssl-cert=mysql/ssl/client-cert.pem
@@ -39,6 +39,7 @@ services:
         ports:
             - 3306
         volumes:
+            - ./scripts:/docker-entrypoint-initdb.d
             - ./my.cnf:/etc/mysql/conf.d/my.cnf:ro
             - mysql_data:/var/lib/mysql
         env_file:
@@ -60,7 +61,7 @@ services:
                 limits:
                     memory: 2048M
         healthcheck:
-            test: export MYSQL_PWD="$$MYSQL_PASSWORD"; output=$$(mysqladmin ping --host=127.0.0.1 --port=3306 --user=$$MYSQL_USER 2>&1); echo $$output | grep 'mysqld is alive' || { echo $$output; exit 1; }
+            test: export MYSQL_PWD="Pa55w0rd"; output=$$(mysqladmin ping --port=3306 --user=$$MYSQL_USER 2>&1); echo $$output | grep 'mysqld is alive' || { echo $$output; exit 1; }
             start_period: 10s
             interval: 30s
             timeout: 5s

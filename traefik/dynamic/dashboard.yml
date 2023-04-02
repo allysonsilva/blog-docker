@@ -6,7 +6,7 @@ http:
     routers:
 
         traefik-ui-rtr:
-            rule: 'Host(`traefik.{{ env "APP_DOMAIN" }}`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))'
+            rule: 'Host(`traefik.{{ env "APP_DOMAIN" }}`) && (PathPrefix(`/api/`) || PathPrefix(`/dashboard/`))'
             priority: 99
             service: api@internal
             entrypoints:
@@ -15,12 +15,6 @@ http:
                 - management
 
     middlewares:
-
-        # traefik-known-ips:
-        #     ipWhiteList:
-        #         sourceRange:
-        #             - "172.20.0.0/16"
-        #             - "172.25.0.0/16"
 
         traefik-headers:
             headers:

@@ -30,6 +30,8 @@ RUN set -xe \
             --no-scripts \
             --no-interaction
 
+RUN ls -la .
+
 #####
 ## FRONTEND
 #####
@@ -46,52 +48,10 @@ RUN set -xe \
     && npm install
 
 #####
-## APP CONTAINER
+## PHP EXTENSIONS + DEPENDENCIES
 #####
 
-FROM php:$PHP_BASE_IMAGE_VERSION
-
-ARG APP_FOLDER
-ARG DOCKER_FOLDER
-
-# = /usr/local/etc/php
-ENV PHP_INI_DIR ${PHP_INI_DIR:-/usr/local/etc/php}
-# = /usr/local/etc/php/conf.d
-ENV PHP_INI_SCAN_DIR ${PHP_INI_DIR}/conf.d
-# Default PATH LOG
-ENV LOG_PATH=/usr/local/var/log
-# Path logs PHP
-ENV PHP_LOG_PATH=$LOG_PATH/php
-
-# Default directory for application deployment
-# Location of the folder in the container, path of the folder inside the container
-ARG REMOTE_SRC=/var/www/app
-ENV REMOTE_SRC $REMOTE_SRC
-
-# Image user
-ARG USER_NAME=app
-ENV USER_NAME $USER_NAME
-
-ARG USER_UID=1000
-ARG USER_GID=1000
-
-# Path docker PHP/APP folder
-# Path Config/Dockerfile PHP/APP
-ARG LOCAL_DOCKER_PHP_PATH=$DOCKER_FOLDER/php
-ENV LOCAL_DOCKER_PHP_PATH $LOCAL_DOCKER_PHP_PATH
-
-ARG LOCAL_DOCKER_MYSQL_PATH=$DOCKER_FOLDER/mysql
-ARG LOCAL_DOCKER_MYSQL_SSL_PATH=$LOCAL_DOCKER_MYSQL_PATH/ssl
-
-ARG APP_FOLDER
-ENV APP_FOLDER $APP_FOLDER
-
-# app || queue || scheduler
-ARG CONTAINER_ROLE=app
-ENV CONTAINER_ROLE $CONTAINER_ROLE
-
-ARG APP_ENV=production
-ENV APP_ENV ${APP_ENV:-production}
+FROM php:$PHP_BASE_IMAGE_VERSION as dependencies
 
 RUN set -xe; \
     \
@@ -229,6 +189,54 @@ RUN set -xe; \
     rm -rf /tmp/* /var/cache/apk/*
 
 #####
+## APP CONTAINER
+#####
+
+FROM dependencies
+
+ARG APP_FOLDER
+ARG DOCKER_FOLDER
+
+# = /usr/local/etc/php
+ENV PHP_INI_DIR ${PHP_INI_DIR:-/usr/local/etc/php}
+# = /usr/local/etc/php/conf.d
+ENV PHP_INI_SCAN_DIR ${PHP_INI_DIR}/conf.d
+# Default PATH LOG
+ENV LOG_PATH=/usr/local/var/log
+# Path logs PHP
+ENV PHP_LOG_PATH=$LOG_PATH/php
+
+# Default directory for application deployment
+# Location of the folder in the container, path of the folder inside the container
+ARG REMOTE_SRC=/var/www/app
+ENV REMOTE_SRC $REMOTE_SRC
+
+# Image user
+ARG USER_NAME=app
+ENV USER_NAME $USER_NAME
+
+ARG USER_UID=1000
+ARG USER_GID=1000
+
+# Path docker PHP/APP folder
+# Path Config/Dockerfile PHP/APP
+ARG LOCAL_DOCKER_PHP_PATH=$DOCKER_FOLDER/php
+ENV LOCAL_DOCKER_PHP_PATH $LOCAL_DOCKER_PHP_PATH
+
+ARG LOCAL_DOCKER_MYSQL_PATH=$DOCKER_FOLDER/mysql
+ARG LOCAL_DOCKER_MYSQL_SSL_PATH=$LOCAL_DOCKER_MYSQL_PATH/ssl
+
+ARG APP_FOLDER
+ENV APP_FOLDER $APP_FOLDER
+
+# app || queue || scheduler
+ARG CONTAINER_ROLE=app
+ENV CONTAINER_ROLE $CONTAINER_ROLE
+
+ARG APP_ENV=production
+ENV APP_ENV ${APP_ENV:-production}
+
+#####
 ## CONFIGURATIONS
 #####
 
@@ -270,7 +278,7 @@ RUN set -xe \
     && sed -i "/root/s/bin\/ash/bin\/bash/g" /etc/passwd
 
 RUN if [ ! -d "$REMOTE_SRC" ]; then \
-        mkdir -p /tmp/php /tmp/php/sessions /tmp/php/uploads $REMOTE_SRC $REMOTE_SRC/certs/mysql \
+        mkdir -p /tmp/php /tmp/php/sessions /tmp/php/uploads $REMOTE_SRC $REMOTE_SRC/database/certs/mysql \
     ;fi
 
 COPY $LOCAL_DOCKER_MYSQL_SSL_PATH/ca.pem $REMOTE_SRC/database/certs/mysql/
@@ -324,6 +332,15 @@ RUN     if [ -d ${DOCKER_FOLDER} ]; then \
             rm -rf ${DOCKER_FOLDER} \
         ;fi
 
+RUN set -xe \
+    && echo "---> Installing Composer" \
+    && COMPOSER_HOME="/home/${USER_NAME}/.composer/" \
+    && curl -sS https://getcomposer.org/installer | sudo php -- --install-dir=/usr/local/bin --filename=composer --version=2.5.4
+
+# Environment variables
+# Default: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ENV PATH="$PATH:/home/${USER_NAME}/.composer/vendor/bin"
+
 # Files APP
 # Copy our application
 COPY $APP_FOLDER $REMOTE_SRC
@@ -341,17 +358,6 @@ RUN sudo mkdir -p   storage/logs \
                     storage/framework/sessions \
                     storage/framework/views
 
-RUN sudo chown -R $USER_NAME:$USER_NAME $REMOTE_SRC /var/www
-
-RUN set -xe \
-    && echo "---> Installing Composer" \
-    && COMPOSER_HOME="/home/${USER_NAME}/.composer/" \
-    && curl -sS https://getcomposer.org/installer | sudo php -- --install-dir=/usr/local/bin --filename=composer --version=2.5.4
-
-# Environment variables
-# Default: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ENV PATH="$PATH:/home/${USER_NAME}/.composer/vendor/bin"
-
 RUN set -xe \
     && DEFAULT_PARAMETERS_FD="--threads $(nproc) --hidden --no-ignore --ignore-case --show-errors" \
     && DEFAULT_EXCLUDE_FD='--exclude public -E .git -E vendor -E node_modules' \
@@ -363,6 +369,8 @@ RUN set -xe \
     && sudo chgrp -R $USER_NAME storage bootstrap/cache \
     && sudo chmod -R ug+rwx storage bootstrap/cache
 
+RUN sudo chown -R $USER_NAME:$USER_NAME $REMOTE_SRC
+
 RUN set -xe \
     && php artisan optimize:clear --ansi || true \
     \
@@ -372,13 +380,11 @@ RUN set -xe \
     && composer dump-autoload --optimize --classmap-authoritative --no-dev --ansi || true
 
 RUN set -xe \
-    && sudo chmod a+x artisan \
     && php artisan view:clear \
     && php artisan route:clear \
     && php artisan config:clear \
     && php artisan storage:link \
     && php artisan clear-compiled \
-    && sudo chown -R $USER_NAME:$USER_NAME $REMOTE_SRC \
     && exa --all --group --header --links --long --accessed --modified --git --icons --color=always
 
 VOLUME ${LOG_PATH}

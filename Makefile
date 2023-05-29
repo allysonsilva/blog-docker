@@ -14,8 +14,8 @@ endif
 docker_path := $(shell realpath $(DOCKER_PATH))
 
 uname_OS := $(shell uname -s)
-user_UID := $(shell id -u)
-user_GID := $(shell id -g)
+user_UID := $(if $(USER_UID_SHELL),$(USER_UID_SHELL),$(shell id -u))
+user_GID := $(if $(USER_GID_SHELL),$(USER_GID_SHELL),$(shell id -g))
 current_uid ?= "${user_UID}:${user_GID}"
 
 ifeq ($(uname_OS),Darwin)
@@ -110,6 +110,17 @@ docker/healthcheck: $(eval SHELL:=/bin/bash)
 	done
 	@echo
 	@echo -e $(call message_success, HEALTHCHECK do Container \"$${container}\" OK)
+.PHONY: docker/app/pull
+docker/app/pull:
+	@echo
+	@echo -e $(call message_info, Pull an image APP... 🏗)
+	@echo
+	docker pull ${APP_DOCKER_IMAGE}
+# docker compose \
+	# -f $(docker_path)/php/services/app/docker-compose.yml \
+	# --ansi=auto \
+	# --env-file $(docker_path)/.env \
+	# pull app
 
 # .PHONY: docker/app/build
 # docker/app/build:
@@ -126,22 +137,74 @@ docker/healthcheck: $(eval SHELL:=/bin/bash)
 docker/app/build:
 	@echo
 	@echo -e $(call message_info, Build an image APP... 🏗)
+	@echo
 	docker build \
 		--progress=plain \
 		--cache-from ${APP_DOCKER_REPO}:vendor \
 		--cache-from ${APP_DOCKER_REPO}:frontend \
+		--cache-from ${APP_DOCKER_REPO}:dependencies \
 		--cache-from ${APP_DOCKER_IMAGE} \
 		--tag ${APP_DOCKER_IMAGE} \
 		--file ${DOCKER_PHP_PATH}/Dockerfile \
 		--build-arg USER_UID=${USER_UID} \
 		--build-arg USER_GID=${USER_GID} \
 		--build-arg DOCKER_FOLDER=${DOCKER_FOLDER} \
+		--build-arg APP_DOCKER_REPO=${APP_DOCKER_REPO} \
 	${APP_PATH}
+
+.PHONY: docker/app/push
+docker/app/push:
+	@echo
+	@echo -e $(call message_info, Push Docker Image [BLOG] 🐳)
+	@echo
+	docker push ${APP_DOCKER_IMAGE}
+
+.PHONY: docker/app/dependencies/pull
+docker/app/dependencies/pull:
+	@echo
+	@echo -e $(call message_info, Pull 🚚 Docker Image [DEPENDENCIES] 🐳)
+	@echo
+	docker pull ${APP_DOCKER_REPO}:dependencies
+
+.PHONY: docker/app/dependencies/build
+docker/app/dependencies/build: $(eval SHELL:=/bin/bash)
+	@echo
+	@echo -e $(call message_info, Creating the [DEPENDENCIES] image of the application 🏗)
+	@echo
+	@CACHE_FROM="--cache-from ${APP_DOCKER_REPO}:dependencies"; \
+	if [ "$${no_cache_from:-false}" = "true" ]; then \
+		CACHE_FROM="" ; \
+	fi ; \
+	docker build \
+		--progress=plain \
+		--target dependencies \
+		--cache-from ${APP_DOCKER_REPO}:vendor \
+		--cache-from ${APP_DOCKER_REPO}:frontend \
+		$$CACHE_FROM \
+		--tag ${APP_DOCKER_REPO}:dependencies \
+		--file ${DOCKER_PHP_PATH}/Dockerfile \
+		--build-arg DOCKER_FOLDER=${DOCKER_FOLDER} \
+	${APP_PATH}
+
+.PHONY: docker/app/dependencies/push
+docker/app/dependencies/push:
+	@echo
+	@echo -e $(call message_info, Push 📦 an image [DEPENDENCIES] 🐳)
+	@echo
+	docker push ${APP_DOCKER_REPO}:dependencies
+
+.PHONY: docker/app/vendor/pull
+docker/app/vendor/pull:
+	@echo
+	@echo -e $(call message_info, Pull 🚚 Docker Image [VENDOR] 🐳)
+	@echo
+	docker pull ${APP_DOCKER_REPO}:vendor
 
 .PHONY: docker/app/vendor/build
 docker/app/vendor/build: $(eval SHELL:=/bin/bash)
 	@echo
-	@echo -e $(call message_info, Creating the VENDOR image of the application 🏗)
+	@echo -e $(call message_info, Creating the [VENDOR] image of the application 🏗)
+	@echo
 	@CACHE_FROM="--cache-from ${APP_DOCKER_REPO}:vendor"; \
 	if [ "$${no_cache_from:-false}" = "true" ]; then \
 		CACHE_FROM="" ; \
@@ -155,10 +218,25 @@ docker/app/vendor/build: $(eval SHELL:=/bin/bash)
 		--build-arg DOCKER_FOLDER=${DOCKER_FOLDER} \
 	${APP_PATH}
 
+.PHONY: docker/app/vendor/push
+docker/app/vendor/push:
+	@echo
+	@echo -e $(call message_info, Push 📦 an image [VENDOR] 🐳)
+	@echo
+	docker push ${APP_DOCKER_REPO}:vendor
+
+.PHONY: docker/app/frontend/pull
+docker/app/frontend/pull:
+	@echo
+	@echo -e $(call message_info, Pull 🚚 Docker Image [FRONTEND] 🐳)
+	@echo
+	docker pull ${APP_DOCKER_REPO}:frontend
+
 .PHONY: docker/app/frontend/build
 docker/app/frontend/build: $(eval SHELL:=/bin/bash)
 	@echo
-	@echo -e $(call message_info, Creating the FRONT-END image of the application 🏗)
+	@echo -e $(call message_info, Creating the [FRONT-END] image of the application 🏗)
+	@echo
 	@CACHE_FROM="--cache-from ${APP_DOCKER_REPO}:frontend"; \
 	if [ "$${no_cache_from:-false}" = "true" ]; then \
 		CACHE_FROM="" ; \
@@ -166,22 +244,19 @@ docker/app/frontend/build: $(eval SHELL:=/bin/bash)
 	docker build \
 		--progress=plain \
 		--target frontend \
+		--cache-from ${APP_DOCKER_REPO}:vendor \
 		$$CACHE_FROM \
 		--tag ${APP_DOCKER_REPO}:frontend \
 		--file ${DOCKER_PHP_PATH}/Dockerfile \
 		--build-arg DOCKER_FOLDER=${DOCKER_FOLDER} \
 	${APP_PATH}
 
-.PHONY: docker/app/pull
-docker/app/pull:
+.PHONY: docker/app/frontend/push
+docker/app/frontend/push:
 	@echo
-	@echo -e $(call message_info, Pull an image APP... 🏗)
+	@echo -e $(call message_info, Push 📦 an image [FRONTEND] 🐳)
 	@echo
-	docker compose \
-		-f $(docker_path)/php/services/app/docker-compose.yml \
-		--ansi=auto \
-		--env-file $(docker_path)/.env \
-		pull app
+	docker push ${APP_DOCKER_REPO}:frontend
 
 .PHONY: docker/app/up
 docker/app/up:

@@ -12,6 +12,14 @@ networks:
         external: true
         name: ${TRAEFIK_DOCKER_NETWORK}
 
+secrets:
+    mysql_ca:
+        file: ${DOCKER_MYSQL_SSL_PATH}/ca.pem
+    mysql_client_key:
+        file: ${DOCKER_MYSQL_SSL_PATH}/client-key.pem
+    mysql_client_cert:
+        file: ${DOCKER_MYSQL_SSL_PATH}/client-cert.pem
+
 services:
 
     app:
@@ -27,6 +35,14 @@ services:
                 USER_UID: ${USER_UID}
                 USER_GID: ${USER_GID}
                 DOCKER_FOLDER: ${DOCKER_FOLDER}
+                APP_DOCKER_REPO: ${APP_DOCKER_REPO}
+        secrets:
+            - source: mysql_ca
+              target: ${REMOTE_SRC}/database/certs/mysql/ca.pem
+            - source: mysql_client_key
+              target: ${REMOTE_SRC}/database/certs/mysql/client-key.pem
+            - source: mysql_client_cert
+              target: ${REMOTE_SRC}/database/certs/mysql/client-cert.pem
         # labels:
         #     traefik.enable: true
         #     traefik.tags: public

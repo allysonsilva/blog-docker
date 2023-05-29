@@ -56,7 +56,7 @@ install_composer_dependencies() {
     fi
 }
 
-app_entrypoint() {
+common_entrypoint() {
     php artisan app:generate-feed || true
     php artisan app:generate-sitemap || true
 
@@ -125,11 +125,11 @@ php -v
 echo
 php --ini
 
+common_entrypoint
+
 if [ "$CONTAINER_ROLE" = "APP" ]; then
 
     printf "\033[34m[$CONTAINER_ROLE] Running with Laravel Octane ...\033[0m\n"
-
-    app_entrypoint
 
     exec /usr/local/bin/php -d variables_order=EGPCS artisan octane:start --server=swoole --max-requests=100000 --host=0.0.0.0 --port=8000
 

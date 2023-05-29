@@ -8,12 +8,27 @@ networks:
 volumes:
     queue_logs:
 
+secrets:
+    mysql_ca:
+        file: ${DOCKER_MYSQL_SSL_PATH}/ca.pem
+    mysql_client_key:
+        file: ${DOCKER_MYSQL_SSL_PATH}/client-key.pem
+    mysql_client_cert:
+        file: ${DOCKER_MYSQL_SSL_PATH}/client-cert.pem
+
 services:
 
     queue:
         image: ${QUEUE_DOCKER_IMAGE}
         hostname: ${COMPOSE_PROJECT_NAME}_queue
         container_name: ${COMPOSE_PROJECT_NAME}-${CONTAINER_VERSION}_queue
+        secrets:
+            - source: mysql_ca
+              target: ${REMOTE_SRC}/database/certs/mysql/ca.pem
+            - source: mysql_client_key
+              target: ${REMOTE_SRC}/database/certs/mysql/client-key.pem
+            - source: mysql_client_cert
+              target: ${REMOTE_SRC}/database/certs/mysql/client-cert.pem
         env_file:
             - ${DOCKER_PHP_APP_PATH}/.env.container
             - ${DOCKER_PHP_QUEUE_PATH}/.env.container

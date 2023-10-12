@@ -265,6 +265,20 @@ Para executar o _container de agendamento_, é o seguinte comando: `make docker/
 
 O processo principal do container executará o comando `crond -l 2 -f -L /var/log/cron.log`.
 
+## Screenshots de Algumas Ferramentas
+
+**Netdata**
+![Netdata](assets/images/screenshots/Netdata.png)
+
+**Grafana**
+![Grafana](assets/images/screenshots/Grafana.png)
+
+**Uptime Kuma**
+![Uptime Kuma](<assets/images/screenshots/Uptime Kuma.png>)
+
+**Traefik**
+![Traefik](assets/images/screenshots/Traefik.png)
+
 ## 📝  Changelog
 
 Please see [CHANGELOG](CHANGELOG.md) for more information about the changes on this package.

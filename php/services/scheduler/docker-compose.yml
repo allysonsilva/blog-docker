@@ -34,7 +34,7 @@ services:
             - ${DOCKER_PHP_APP_PATH}/.env
             - ${DOCKER_PHP_SCHEDULER_PATH}/.env
         volumes:
-            - ${DOCKER_PHP_PATH}/docker-entrypoint.sh:/entrypoint.sh:ro
+            # - ${DOCKER_PHP_PATH}/docker-entrypoint.sh:/entrypoint.sh:ro
             # - ${APP_PATH}:/var/www/app:delegated
             - type: volume
               source: scheduler_logs

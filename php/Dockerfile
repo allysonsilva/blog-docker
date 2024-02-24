@@ -1,4 +1,5 @@
 ARG APP_FOLDER=.
+ARG COMPOSER_VERSION=2.7
 ARG DOCKER_FOLDER=./docker
 ARG PHP_BASE_IMAGE_VERSION=8.3-zts-alpine
 ARG FRANKENPHP_VERSION=1.1-php8.3-alpine
@@ -11,6 +12,31 @@ ARG FRANKENPHP_VERSION=1.1-php8.3-alpine
 #####
 
 FROM dunglas/frankenphp:${FRANKENPHP_VERSION} AS server
+
+#####
+## COMPOSER
+#####
+
+FROM composer:${COMPOSER_VERSION} as vendor
+
+WORKDIR /app
+
+ENV COMPOSER_HOME /composer
+
+ARG APP_FOLDER
+
+COPY $APP_FOLDER .
+
+RUN set -xe \
+    &&  composer install \
+        --optimize-autoloader \
+        --ignore-platform-reqs \
+        --prefer-dist \
+        --no-progress \
+        --no-dev \
+        --no-cache \
+        --no-interaction \
+        --ansi
 
 #####
 ## FRONTEND
@@ -242,23 +268,21 @@ RUN     if [ -d ${DOCKER_FOLDER} ]; then \
             rm -rf ${DOCKER_FOLDER} \
         ;fi
 
-# COPY --chown=${USER_NAME}:${USER_NAME} --from=composer:latest /usr/bin/composer /usr/local/bin/composer
+COPY --chown=${USER_NAME}:${USER_NAME} --from=vendor /usr/bin/composer /usr/local/bin/composer
+
 RUN set -xe \
     && echo "---> Installing Composer" \
     && COMPOSER_HOME="/home/${USER_NAME}/.composer/" \
-    && curl -sS https://getcomposer.org/installer | sudo php -- --install-dir=/usr/local/bin --filename=composer --version=2.7.0 \
+    # && curl -sS https://getcomposer.org/installer | sudo php -- --install-dir=/usr/local/bin --filename=composer --version=2.7.0 \
     && sudo chown ${USER_NAME}:${USER_NAME} /usr/local/bin/composer
 
 # Environment variables
 # Default: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ENV PATH="$PATH:/home/${USER_NAME}/.composer/vendor/bin"
 
-## Copy the downloaded dependencies from the {frontend} stage
-COPY --chown=$USER_NAME:$USER_NAME --from=frontend /app/node_modules ./node_modules
-
 # Files APP
-# Copy our application
-COPY --chown=$USER_NAME:$USER_NAME $APP_FOLDER $REMOTE_SRC
+COPY --chown=${USER_NAME}:${USER_NAME} --from=vendor /app/ $REMOTE_SRC
+COPY --chown=${USER_NAME}:${USER_NAME} --from=frontend /app/node_modules $REMOTE_SRC/node_modules
 
 RUN sudo mkdir -p   storage/logs \
                     storage/app/public \
@@ -274,16 +298,6 @@ RUN set -xe \
         /home/${USER_NAME} \
         $LOG_PATH \
         /tmp/php
-
-RUN set -xe \
-    && composer install \
-            --optimize-autoloader \
-            --ignore-platform-req=php \
-            --ignore-platform-req='ext-*' \
-            --prefer-dist \
-            --ansi \
-            --no-dev \
-            --no-interaction
 
 RUN set -xe \
     && DEFAULT_PARAMETERS_FD="--threads $(nproc) --hidden --no-ignore --ignore-case --show-errors" \

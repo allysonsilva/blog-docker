@@ -55,10 +55,10 @@ services:
         #     traefik.http.services.app-svc.loadbalancer.healthcheck.path: /health
         #     traefik.http.services.app-svc.loadbalancer.healthcheck.interval: 30s
         #     traefik.http.services.app-svc.loadbalancer.healthcheck.timeout: 2s
-        volumes:
+        # volumes:
             # - ${DOCKER_PHP_PATH}/configs/conf.d/opcache.ini:/usr/local/etc/php/conf.d/docker-php-ext-opcache.ini
             # - ${DOCKER_PHP_PATH}/configs/php-local.ini:/usr/local/etc/php/php.ini
-            - ${DOCKER_PHP_PATH}/docker-entrypoint.sh:/entrypoint.sh:ro
+            # - ${DOCKER_PHP_PATH}/docker-entrypoint.sh:/entrypoint.sh:ro
             # - ${APP_PATH}:/var/www/app:delegated
             # - type: volume
             #   source: app_logs

@@ -21,7 +21,7 @@ shopt -s dotglob
 sudo chown -R ${USER_NAME}:${USER_NAME} \
         /home/${USER_NAME} \
         /usr/local/var/run \
-        /var/run /var/run/ \
+        /var/run \
         /var/log \
         /tmp/php \
         $LOG_PATH
@@ -38,6 +38,17 @@ configure_php_ini() {
         -e "s/upload_max_filesize.*$/upload_max_filesize = ${PHP_UPLOAD_MAX_FILESIZE:-2M}/g" \
     \
     $PHP_INI_DIR/php.ini
+
+    # # @see https://github.com/dunglas/frankenphp/issues/309
+    # sed -i \
+    #     -e '/opcache.jit_buffer_size/s/^; //g' \
+    #     -e '/opcache.jit/s/^; //g' \
+    # \
+    # $PHP_INI_SCAN_DIR/99-opcache.ini
+
+    # { \
+    #     echo 'session.use_strict_mode = 1'; \
+    # } > $PHP_INI_SCAN_DIR/zz-session-strict.ini
 }
 
 install_composer_dependencies() {

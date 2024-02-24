@@ -3,7 +3,7 @@
     <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/Laravel.svg/1200px-Laravel.svg.png" width="50"/>
     <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/grafana/grafana-original.svg" width="50"/>
     <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/mongodb/mongodb-original.svg" width="50"/>
-    <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/mysql/mysql-plain.svg" width="50"/>
+    <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/mysql/mysql-original-wordmark.svg" width="50"/>
     <img src="https://blog.netdata.cloud/img/logo600x600.png" width="50"/>
     <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/php/php-plain.svg" width="50"/>
     <img src="https://cdn.worldvectorlogo.com/logos/portainer.svg" width="50"/>
@@ -20,7 +20,7 @@
 
 Uma coleção de ferramentas, serviços e imagens executados em docker: **Laravel**, **Laravel Octane**, **FrankenPHP**,  **Grafana**, **MongoDB**, **MySQL**, **Netdata**, **Php**, **Portainer**, **Prometheus**, **Redis**, [**Soketi**](https://docs.soketi.app), **Traefik** e [**Uptime Kuma**](https://github.com/louislam/uptime-kuma).
 
-<img src="https://forge.laravel.com/build/assets/octane.1f009bcf.svg" width="200"/>
+<img src="./assets/images/logos/laravel-octane.svg" width="200"/>
 
 ## Estrutura do Repositório
 

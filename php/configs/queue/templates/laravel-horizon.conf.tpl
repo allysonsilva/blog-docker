@@ -8,8 +8,10 @@ autorestart=true
 numprocs=1
 startretries=2
 
-redirect_stderr=true
-stdout_logfile=%(ENV_REMOTE_SRC)s/storage/logs/horizon.out.log
+stdout_logfile=/dev/stdout
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/stderr
+stderr_logfile_maxbytes=0
 
 ; (120 seconds) timeout to give jobs time to finish
 ; Graceful shutdown

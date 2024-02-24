@@ -8,8 +8,10 @@ autorestart=true
 numprocs=6
 startretries=2
 
-redirect_stderr=true
-stdout_logfile=%(ENV_REMOTE_SRC)s/storage/logs/worker-queue.out.log
+stdout_logfile=/dev/stdout
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/stderr
+stderr_logfile_maxbytes=0
 
 ; (300 seconds) timeout to give jobs time to finish
 ; Graceful shutdown

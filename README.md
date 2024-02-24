@@ -18,7 +18,7 @@
 
 > 🐳 Docker utilizado na execução do meu site / blog pessoal.
 
-Uma coleção de ferramentas, serviços e imagens executados em docker: **Laravel**, **Laravel Octane**, **Swoole**,  **Grafana**, **MongoDB**, **MySQL**, **Netdata**, **Php**, **Portainer**, **Prometheus**, **Redis**, [**Soketi**](https://docs.soketi.app), **Traefik** e [**Uptime Kuma**](https://github.com/louislam/uptime-kuma).
+Uma coleção de ferramentas, serviços e imagens executados em docker: **Laravel**, **Laravel Octane**, **FrankenPHP**,  **Grafana**, **MongoDB**, **MySQL**, **Netdata**, **Php**, **Portainer**, **Prometheus**, **Redis**, [**Soketi**](https://docs.soketi.app), **Traefik** e [**Uptime Kuma**](https://github.com/louislam/uptime-kuma).
 
 <img src="https://forge.laravel.com/build/assets/octane.1f009bcf.svg" width="200"/>
 
@@ -249,7 +249,7 @@ make docker/service/up context=uptime
 
 _Ver arquivo de `docker/php/services/app/.env` e editar as variáveis de ambiente conforme necessário._
 
-O container do aplicativo executa o **LARAVEL OCTANE** com **SWOOLE**, produzindo o seguinte comando principal: `php artisan octane:start --server=swoole`.
+O container do aplicativo executa o **LARAVEL OCTANE** com **FrankenPHP**, produzindo o seguinte comando principal: `php artisan octane:frankenphp`.
 
 Execute com: `./scripts/deploy-new-version.sh`
 

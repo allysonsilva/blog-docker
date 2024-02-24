@@ -132,7 +132,9 @@ if [ "$CONTAINER_ROLE" = "APP" ]; then
 
     printf "\033[34m[$CONTAINER_ROLE] Running with Laravel Octane ...\033[0m\n"
 
-    exec /usr/local/bin/php -d variables_order=EGPCS artisan octane:start --server=swoole --max-requests=100000 --host=0.0.0.0 --port=8000
+    sudo mv /etc/supervisor/conf.d/laravel-octane.conf.tpl /etc/supervisor/conf.d/laravel-octane.conf
+
+    exec /usr/bin/supervisord --nodaemon --configuration /etc/supervisor/supervisord.conf
 
 elif [ "$CONTAINER_ROLE" = "QUEUE" ]; then
 

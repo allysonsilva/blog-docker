@@ -1,55 +1,43 @@
 ARG APP_FOLDER=.
 ARG DOCKER_FOLDER=./docker
-ARG PHP_BASE_IMAGE_VERSION=8.2-cli-alpine
+ARG PHP_BASE_IMAGE_VERSION=8.3-zts-alpine
+ARG FRANKENPHP_VERSION=1.1-php8.3-alpine
+
+# @see https://github.com/exaco/laravel-octane-dockerfile/blob/main/FrankenPHP.Dockerfile
+# @see https://github.com/dunglas/frankenphp/blob/main/alpine.Dockerfile
 
 #####
-## COMPOSER
+## SERVER
 #####
 
-FROM composer:2.5 as vendor
-
-WORKDIR /app
-
-ENV COMPOSER_HOME /composer
-
-ARG APP_FOLDER
-
-# Copy only the files needed to download dependencies to avoid redownloading them when our code changes
-COPY $APP_FOLDER/composer.json composer.json
-# COPY $APP_FOLDER/composer.lock composer.lock
-
-RUN set -xe \
-    &&  composer install \
-            --optimize-autoloader \
-            --ignore-platform-reqs \
-            --prefer-dist \
-            --ansi \
-            --no-dev \
-            --profile \
-            --no-cache \
-            --no-scripts \
-            --no-interaction
+FROM dunglas/frankenphp:${FRANKENPHP_VERSION} AS server
 
 #####
 ## FRONTEND
 #####
 
-FROM node:18-alpine as frontend
-
-WORKDIR /app
+FROM node:21-alpine as frontend
 
 ARG APP_FOLDER
 
-COPY $APP_FOLDER/package.json ./
+ENV ROOT=/app
+
+WORKDIR ${ROOT}
+
+RUN npm config set update-notifier false && npm set progress=false
+
+COPY $APP_FOLDER/package*.json ./
 
 RUN set -xe \
-    && npm install
+    && npm install --loglevel=error --no-audit
 
 #####
-## PHP EXTENSIONS + DEPENDENCIES
+## PHP
 #####
 
 FROM php:$PHP_BASE_IMAGE_VERSION as dependencies
+
+COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
 
 RUN set -xe; \
     \
@@ -57,96 +45,28 @@ RUN set -xe; \
     \
     apk update; \
     \
-    apk add --no-cache --virtual .build-deps \
-        # for sockets
-        linux-headers \
-        # \
-        $PHPIZE_DEPS \
-        curl-dev \
-        pcre-dev \
-        # SQLite3
-        sqlite-dev \
-        # for intl extension
-        icu-dev \
-        # for GD
-        freetype-dev \
-        libpng-dev \
-        libjpeg-turbo-dev \
-        libwebp-dev \
-        # for zip extension
-        zlib-dev \
-        libzip-dev \
-        gnutls-dev \
-        # for gpm extension
-        gmp-dev \
-        # for soap
-        libxml2-dev \
-        # for amqp
-        rabbitmq-c-dev \
-    ; \
-    apk add --no-cache --virtual .persistent-deps \
-        vim \
-        # for intl
-        icu-libs \
-        # for mongodb
-        libssl1.1 \
-        # for zip
-        libzip \
-        # for gpm
-        gmp \
-    ; \
-    docker-php-ext-configure gd \
-        --enable-gd \
-        --with-jpeg \
-        --with-webp \
-        --with-freetype \
-    ; \
+    apk add --no-cache --virtual .phpize-deps $PHPIZE_DEPS && \
     docker-php-ext-configure mysqli --with-mysqli=mysqlnd && \
     docker-php-ext-configure pdo_mysql --with-pdo-mysql=mysqlnd && \
-    docker-php-ext-configure zip --with-zip && \
-    docker-php-ext-install -j $(nproc) \
-        exif \
-        intl \
+    install-php-extensions \
         gd \
+        zip \
         gmp \
-        pcntl \
-        mysqli \
-        pdo_mysql \
+        intl \
         soap \
+        exif \
+        pcntl \
+        bcmath \
+        mysqli \
         sockets \
         opcache \
-        zip \
-        bcmath \
-        calendar \
-    ; \
-    pecl install -o -f \
-        ds-1.4.0 \
-        amqp-1.11.0 \
-        mongodb-1.15.1 \
-        excimer-1.1.1 \
-    ; \
-        pecl install -o -f -D 'enable-sockets="yes" enable-openssl="yes" enable-http2="yes" enable-mysqlnd="yes" enable-swoole-json="yes" enable-swoole-curl="yes" enable-cares="no"' swoole-5.0.2 \
-    ; \
-    \
-    # Igbinary: Is a drop in replacement for the standard php serializer.
-    pecl install -o -f \
-        igbinary-3.2.14 \
-    ; \
-    # redis/configure \
-    #       --with-php-config=/usr/local/bin/php-config \
-    #       --enable-redis-igbinary=yes \
-    #       --enable-redis-lzf=no \
-    #       --enable-redis-zstd=no
-    printf "yes \n no \n no \n" | pecl install redis-5.3.7 \
-    ; \
-    docker-php-ext-enable \
-        ds \
-        amqp \
-        swoole \
-        igbinary \
-        redis \
-        mongodb \
-        excimer \
+        pdo_mysql \
+        ds-^1 \
+        amqp-^2.1@stable \
+        mongodb-^1.17@stable \
+        igbinary-^3.2@stable \
+        msgpack-^2.2@stable \
+        redis-^6@stable \
     ; \
     php --version \
     ; \
@@ -157,7 +77,8 @@ RUN set -xe; \
             | awk 'system("[ -e /usr/local/lib/" $1 " ]") == 0 { next } { print "so:" $1 }' \
     )"; \
     apk add --no-cache $runDeps; \
-    apk del --no-network .build-deps; \
+    apk del --no-network .phpize-deps; \
+    docker-php-source delete; \
     rm -rf /tmp/* /var/cache/apk/*
 
 RUN set -xe; \
@@ -170,6 +91,8 @@ RUN set -xe; \
         fd \
         exa \
         git \
+        vim \
+        npm \
         sudo \
         curl \
         wget \
@@ -177,11 +100,11 @@ RUN set -xe; \
         bash \
         tini \
         nodejs \
-        npm \
+        tzdata \
+        libcap \
         bind-tools \
         supervisor \
         mysql-client \
-        mariadb-connector-c \
         busybox-suid \
         openssh-client \
         bash-completion; \
@@ -193,6 +116,12 @@ RUN set -xe; \
 #####
 
 FROM dependencies as main
+
+LABEL maintainer="Alyson Silva <hello@alysonsilva.dev>"
+LABEL org.opencontainers.image.title="alysonsilva.dev Laravel Octane Dockerfile"
+LABEL org.opencontainers.image.description="Docker my personal blog using octane Laravel Octane"
+LABEL org.opencontainers.image.source=https://github.com/allysonsilva/blog-docker
+LABEL org.opencontainers.image.licenses=MIT
 
 ARG APP_FOLDER
 ARG DOCKER_FOLDER
@@ -240,7 +169,7 @@ ENV APP_ENV ${APP_ENV:-production}
 ## CONFIGURATIONS
 #####
 
-COPY $LOCAL_DOCKER_PHP_PATH/configs/conf.d/opcache.ini $PHP_INI_SCAN_DIR/docker-php-ext-opcache.ini
+COPY $LOCAL_DOCKER_PHP_PATH/configs/conf.d/* $PHP_INI_SCAN_DIR/
 
 # /usr/local/etc/php/php.ini
 COPY $LOCAL_DOCKER_PHP_PATH/configs/php-$APP_ENV.ini $PHP_INI_DIR/php.ini
@@ -251,12 +180,6 @@ COPY $LOCAL_DOCKER_PHP_PATH/configs/queue/templates/* /etc/supervisor/conf.d/
 
 RUN set -xe \
     && mkdir -p $PHP_LOG_PATH $LOG_PATH/supervisor && touch $PHP_LOG_PATH/php.errors.log
-
-RUN set -xe \
-    && PHP_ERROR="$( php -v 2>&1 1>/dev/null )" \
-    && if [ -n "$PHP_ERROR" ]; then echo "$PHP_ERROR"; false; fi \
-    && php -m; php -v; php --ini \
-    && php -i | grep -E '^opcache\.(enable_cli|jit|jit_buffer_size) '
 
 RUN if [ "$USER_UID" != 1000 ]; then \
         set -xe \
@@ -300,17 +223,6 @@ RUN set -xe; \
     \
     touch /var/spool/cron/crontabs/$USER_NAME
 
-RUN set -xe \
-    && echo "---> Changing Permissions" \
-    && chown -R $USER_NAME:$USER_NAME \
-        /usr/local/etc \
-        /var/run /var/run/ \
-        /usr/local/var/run \
-        /home/${USER_NAME} \
-        $LOG_PATH \
-        /var/log \
-        /tmp/php
-
 # ENTRYPOINT
 COPY $LOCAL_DOCKER_PHP_PATH/docker-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
@@ -330,20 +242,18 @@ RUN     if [ -d ${DOCKER_FOLDER} ]; then \
             rm -rf ${DOCKER_FOLDER} \
         ;fi
 
+# COPY --chown=${USER_NAME}:${USER_NAME} --from=composer:latest /usr/bin/composer /usr/local/bin/composer
 RUN set -xe \
     && echo "---> Installing Composer" \
     && COMPOSER_HOME="/home/${USER_NAME}/.composer/" \
-    && curl -sS https://getcomposer.org/installer | sudo php -- --install-dir=/usr/local/bin --filename=composer --version=2.5.4
+    && curl -sS https://getcomposer.org/installer | sudo php -- --install-dir=/usr/local/bin --filename=composer --version=2.7.0 \
+    && sudo chown ${USER_NAME}:${USER_NAME} /usr/local/bin/composer
 
 # Environment variables
 # Default: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ENV PATH="$PATH:/home/${USER_NAME}/.composer/vendor/bin"
 
-## Copy the downloaded dependencies from the {vendor} stage
-COPY --chown=$USER_NAME:$USER_NAME --from=vendor /app/vendor/ ./vendor/
-COPY --chown=$USER_NAME:$USER_NAME --from=vendor /app/composer.json ./composer.json
-COPY --chown=$USER_NAME:$USER_NAME --from=vendor /app/composer.lock ./composer.lock
-
+## Copy the downloaded dependencies from the {frontend} stage
 COPY --chown=$USER_NAME:$USER_NAME --from=frontend /app/node_modules ./node_modules
 
 # Files APP
@@ -352,9 +262,28 @@ COPY --chown=$USER_NAME:$USER_NAME $APP_FOLDER $REMOTE_SRC
 
 RUN sudo mkdir -p   storage/logs \
                     storage/app/public \
-                    storage/framework/cache \
-                    storage/framework/sessions \
-                    storage/framework/views
+                    storage/framework/{sessions,views,cache}
+
+RUN set -xe \
+    && echo "---> Changing Permissions" \
+    && sudo chown -R $USER_NAME:$USER_NAME \
+        /usr/local/etc \
+        /var/run \
+        /var/log \
+        /usr/local/var/run \
+        /home/${USER_NAME} \
+        $LOG_PATH \
+        /tmp/php
+
+RUN set -xe \
+    && composer install \
+            --optimize-autoloader \
+            --ignore-platform-req=php \
+            --ignore-platform-req='ext-*' \
+            --prefer-dist \
+            --ansi \
+            --no-dev \
+            --no-interaction
 
 RUN set -xe \
     && DEFAULT_PARAMETERS_FD="--threads $(nproc) --hidden --no-ignore --ignore-case --show-errors" \
@@ -368,39 +297,28 @@ RUN set -xe \
     && sudo chmod -R ug+rwx storage bootstrap/cache
 
 RUN set -xe \
-    && php artisan optimize:clear --ansi || true \
-    \
-    && composer run-script post-autoload-dump || true \
-    && composer run-script post-root-package-install || true \
-    && composer run-script post-create-project-cmd || true \
-    && composer dump-autoload --optimize --classmap-authoritative --no-dev --ansi || true
-
-RUN set -xe \
     && php artisan view:clear \
     && php artisan route:clear \
     && php artisan config:clear \
     && php artisan storage:link \
-    && php artisan clear-compiled \
     && exa --all --group --header --links --long --accessed --modified --git --icons --color=always
+
+COPY --chown=$USER_NAME:$USER_NAME --from=server /usr/local/bin/frankenphp /usr/local/bin/frankenphp
+
+RUN sudo setcap cap_net_bind_service=+ep /usr/local/bin/frankenphp
+
+RUN set -xe \
+    && PHP_ERROR="$( php -v 2>&1 1>/dev/null )" \
+    && if [ -n "$PHP_ERROR" ]; then echo "$PHP_ERROR"; false; fi \
+    && php -m; php -v; php --ini \
+    && php -i | grep -E '^opcache\.(enable_cli|jit|jit_buffer_size) ' \
+    && composer --version \
+    && frankenphp version
 
 VOLUME ${LOG_PATH}
 
 ENTRYPOINT ["/sbin/tini", "--", "/entrypoint.sh"]
 
-# # Override stop signal to stop process gracefully
-# STOPSIGNAL SIGQUIT
-
-# set recommended PHP.ini settings
-# see https://secure.php.net/manual/en/opcache.installation.php
-RUN { \
-        echo 'session.use_strict_mode = 1'; \
-        echo 'session.use_cookies = 1'; \
-        echo 'session.cookie_secure = 1'; \
-        echo 'session.use_only_cookies = 1'; \
-        echo 'session.cookie_httponly = 1'; \
-        echo 'session.cookie_samesite = "Strict"'; \
-    } > /usr/local/etc/php/conf.d/zz-session-strict.ini
-
-EXPOSE 4000 8080 8000 9005
+EXPOSE 80 443 443/udp 2019 8000
 
 # vim:set ft=dockerfile:

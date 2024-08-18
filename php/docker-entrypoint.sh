@@ -184,24 +184,9 @@ elif [ "$CONTAINER_ROLE" = "QUEUE" ]; then
     # php artisan queue:restart
 
 elif [ "$CONTAINER_ROLE" = "SCHEDULER" ]; then
+    printf "\n\033[34m[$CONTAINER_ROLE] Starting [CRON] Service ...\033[0m\n\n"
 
-    if ! sudo grep -q "\/artisan schedule:run" /etc/crontabs/${USER_NAME}; then
-        printf "\n\033[33mAdding >_ php artisan schedule:run >> /dev/null 2>&1 command to crond\033[0m\n"
-
-        # https://crontab.guru/every-minute
-        sudo crontab -l -u $USER_NAME | { cat; echo "* * * * * /usr/local/bin/php ${REMOTE_SRC}/artisan schedule:run --no-ansi >> ${REMOTE_SRC}/storage/logs/scheduler.log 2>&1"; } | sudo crontab -u $USER_NAME -
-    fi
-
-    # It must be used so that CRON can use the values of the environment variables
-    # The CRON service can not retrieve all environment variables, especially those defined in the docker-compose.yml file, when the line below is not set
-    sudo printenv > /etc/environment
-
-    sudo sed -i -e "s|{{REMOTE_SRC}}|${REMOTE_SRC}|g" /etc/crontabs/${USER_NAME}
-    sudo sed -i -e "s|{{REMOTE_SRC}}|${REMOTE_SRC}|g" /var/spool/cron/crontabs/$USER_NAME
-
-    printf "\n\033[34m[$CONTAINER_ROLE] Starting [SCHEDULE] Service ...\033[0m\n\n"
-
-    exec /usr/sbin/crond -l 2 -f -L /var/log/cron.log
+    exec php artisan schedule:work
 fi
 
 exec "$@"

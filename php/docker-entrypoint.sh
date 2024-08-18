@@ -82,7 +82,7 @@ common_entrypoint() {
 
 # $> {view:clear} && {cache:clear} && {route:clear} && {config:clear} && {clear-compiled}
 # @see https://github.com/laravel/framework/blob/9.x/src/Illuminate/Foundation/Console/OptimizeClearCommand.php
-if [[ -d "vendor" && ${FORCE_CLEAR:-false} == true ]]; then
+if [[ -d "vendor" && ${FORCE_CLEAR:-true} == true ]]; then
     printf "\n\033[33mLaravel - artisan view:clear + route:clear + config:clear + clear-compiled\033[0m\n\n"
 
     php artisan event:clear || true
@@ -98,7 +98,7 @@ if [[ -d "vendor" && ${CACHE_CLEAR:-false} == true ]]; then
     php artisan cache:clear 2>/dev/null || true
 fi
 
-if [[ -d "vendor" && ${FORCE_OPTIMIZE:-false} == true ]]; then
+if [[ -d "vendor" && ${FORCE_OPTIMIZE:-true} == true ]]; then
     printf "\n\033[33mLaravel Cache Optimization - artisan config:cache + route:cache + view:cache\033[0m\n\n"
 
     # $> {config:cache} && {route:cache}
@@ -114,7 +114,7 @@ if [[ -d "vendor" && ${FORCE_MIGRATE:-false} == true ]]; then
     php artisan migrate --force || true
 fi
 
-if [[ ${FORCE_STORAGE_LINK:-false} == true ]]; then
+if [[ ${FORCE_STORAGE_LINK:-true} == true ]]; then
     printf "\n\033[33mLaravel - artisan storage:link\033[0m\n\n"
 
     rm -rf ${REMOTE_SRC}/public/storage || true
@@ -137,9 +137,8 @@ php -v
 echo
 php --ini
 
-common_entrypoint
-
 if [ "$CONTAINER_ROLE" = "APP" ]; then
+    common_entrypoint
 
     printf "\033[34m[$CONTAINER_ROLE] Running with Laravel Octane ...\033[0m\n"
 
@@ -195,7 +194,7 @@ elif [ "$CONTAINER_ROLE" = "SCHEDULER" ]; then
 
     # It must be used so that CRON can use the values of the environment variables
     # The CRON service can not retrieve all environment variables, especially those defined in the docker-compose.yml file, when the line below is not set
-    printenv > /etc/environment
+    sudo printenv > /etc/environment
 
     sudo sed -i -e "s|{{REMOTE_SRC}}|${REMOTE_SRC}|g" /etc/crontabs/${USER_NAME}
     sudo sed -i -e "s|{{REMOTE_SRC}}|${REMOTE_SRC}|g" /var/spool/cron/crontabs/$USER_NAME

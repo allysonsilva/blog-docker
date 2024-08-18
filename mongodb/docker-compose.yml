@@ -17,7 +17,7 @@ services:
         container_name: ${COMPOSE_PROJECT_NAME}_mongodb
         command: --config /etc/mongo/mongod.conf
         ports:
-            - 27017
+            - "${COMPOSE_MONGODB_PORT:-27017}:27017"
         volumes:
             - ./mongod.conf:/etc/mongo/mongod.conf:ro
             - mongodb_data:/data/db

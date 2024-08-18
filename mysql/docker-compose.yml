@@ -37,7 +37,7 @@ services:
             - source: mysql_server_cert
               target: /etc/mysql-ssl/server-cert.pem
         ports:
-            - 3306
+            - "${COMPOSE_MYSQL_PORT:-3306}:3306"
         volumes:
             - ./scripts:/docker-entrypoint-initdb.d
             - ./my.cnf:/etc/mysql/conf.d/my.cnf:ro
